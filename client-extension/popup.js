@@ -68,7 +68,9 @@ document.addEventListener('DOMContentLoaded', () => {
               if (!isRecordable) {
                 renderNotRecordable();
               } else {
-                renderReady();
+                chrome.storage.local.get(['last_recording_error'], (errResult) => {
+                  renderReady(errResult.last_recording_error || '');
+                });
               }
             });
           }
@@ -112,6 +114,9 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
 
     document.getElementById('startBtn').addEventListener('click', () => {
+      // Clear previous error on fresh click
+      chrome.storage.local.remove(['last_recording_error']);
+
       contentDiv.innerHTML = `
         <div class="spinner"></div>
         <p class="message">Waiting for screen selection...</p>

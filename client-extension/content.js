@@ -152,11 +152,11 @@ function forwardMessage(msg) {
   }
 }
 
-// On Page Load: check if currently recording and restore widget state
-chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' }, (response) => {
+// Read state directly from chrome.storage.local on page load
+chrome.storage.local.get(['recording_state', 'recording_start_time'], (result) => {
   recordingStateResolved = true;
-  if (response && response.recordingState === 'recording') {
-    recordingStartTime = response.recordingStartTime;
+  if (result && result.recording_state === 'recording') {
+    recordingStartTime = result.recording_start_time;
     isRecording = true;
     
     // Process early messages received before this async state callback ran
@@ -169,8 +169,50 @@ chrome.runtime.sendMessage({ type: 'GET_RECORDING_STATE' }, (response) => {
     } else {
       document.addEventListener('DOMContentLoaded', renderFloatingWidget);
     }
+  } else {
+    isRecording = false;
+    recordingStartTime = null;
+    removeUIElements();
   }
   earlyMessageQueue = [];
+});
+
+// Listen to storage changes to keep all tabs in sync
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace !== 'local') return;
+
+  if (changes.recording_state) {
+    const newState = changes.recording_state.newValue;
+    if (newState === 'recording') {
+      chrome.storage.local.get(['recording_start_time'], (res) => {
+        recordingStartTime = res.recording_start_time || Date.now();
+        isRecording = true;
+
+        earlyMessageQueue.forEach((msg) => {
+          forwardMessage(msg);
+        });
+        earlyMessageQueue = [];
+
+        if (document.body) {
+          renderFloatingWidget();
+        } else {
+          document.addEventListener('DOMContentLoaded', renderFloatingWidget);
+        }
+      });
+    } else {
+      isRecording = false;
+      recordingStartTime = null;
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      
+      // Remove only the floating widget on non-active tabs.
+      // Active tabs showing the upload modal should keep the backdrop/modal.
+      const w = document.getElementById('jam-floating-widget');
+      if (w) w.remove();
+    }
+  }
 });
 
 // ── Step 2: Receive events from inject.js ───────────────────────
@@ -220,29 +262,91 @@ document.addEventListener('input', (e) => {
   sendAction('input', e.target, '***'); // mask values
 }, true);
 
-// ── Step 4: Runtime Communication & Recorders ────────────────────
+// ── Step 4: Runtime Communication & Control Overlays ────────────────────
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
-  if (request.type === 'TRIGGER_CAPTURE_START') {
-    recordingStartTime = request.startTime;
-    if (document.body) {
-      showStartPromptOverlay();
-    } else {
-      document.addEventListener('DOMContentLoaded', showStartPromptOverlay);
-    }
+  if (request.type === 'PING') {
     sendResponse({ ok: true });
     return false;
   }
 
-  if (request.type === 'TRIGGER_CAPTURE_STOP') {
+  if (request.type === 'START_CAPTURE') {
+    startCapture(request.streamId)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => {
+        chrome.storage.local.set({ 
+          recording_state: 'idle',
+          last_recording_error: err.message || 'Failed to start capture'
+        });
+        sendResponse({ error: err.message || 'Failed to start capture' });
+      });
+    return true; // async
+  }
+
+  if (request.type === 'TRIGGER_STOP') {
     stopRecordingAndShowModal();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === 'RENDER_UPLOAD_MODAL') {
+    capturedVideoDataUrl = request.videoDataUrl;
+    showUploadModal();
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (request.type === 'RENDER_UPLOAD_MODAL_FALLBACK') {
+    showUploadModalFallback(request.error);
     sendResponse({ ok: true });
     return false;
   }
 });
 
-// ── RENDER START OVERLAY BANNER ──────────────────────────────────
-function showStartPromptOverlay() {
+// ── START LOCAL CAPTURE (getUserMedia + MediaRecorder in content script) ──
+async function startCapture(streamId) {
+  recordedChunks = [];
+  
+  // getUserMedia with chromeMediaSourceId works here because this content script
+  // runs in the targetTab that was passed to chooseDesktopMedia.
+  mediaStream = await navigator.mediaDevices.getUserMedia({
+    audio: false,
+    video: {
+      mandatory: {
+        chromeMediaSource: 'desktop',
+        chromeMediaSourceId: streamId
+      }
+    }
+  });
+
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+    ? 'video/webm;codecs=vp9'
+    : 'video/webm';
+
+  mediaRecorder = new MediaRecorder(mediaStream, { mimeType });
+
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data && event.data.size > 0) {
+      recordedChunks.push(event.data);
+    }
+  };
+
+  // If screen capture is stopped natively via Chrome's "Stop Sharing" toolbar
+  const videoTracks = mediaStream.getVideoTracks();
+  if (videoTracks && videoTracks.length > 0) {
+    videoTracks[0].addEventListener('ended', () => {
+      if (isRecording) {
+        stopRecordingAndShowModal();
+      }
+    });
+  }
+
+  mediaRecorder.start(1000);
+  isRecording = true;
+}
+
+// ── RENDER PREPARING VIDEO OVERLAY ────────────────────────────────
+function showPreparingOverlay() {
   removeUIElements();
 
   const backdrop = document.createElement('div');
@@ -251,81 +355,13 @@ function showStartPromptOverlay() {
   const card = document.createElement('div');
   card.className = 'jam-card';
   card.innerHTML = `
-    <h2 class="jam-title">🎬 Start Recording</h2>
-    <p class="jam-text">Please select a screen, window, or tab to begin your debugging session recording.</p>
-    <button class="jam-btn jam-btn-primary" id="jam-select-screen-btn">Choose Screen</button>
-    <button class="jam-btn jam-btn-secondary" id="jam-cancel-screen-btn">Cancel</button>
+    <div class="jam-spinner"></div>
+    <h2 class="jam-title" style="margin-top: 15px;">🎬 Stitching Recording</h2>
+    <p class="jam-text">Processing recorded frames and generating video. Please wait...</p>
   `;
 
   backdrop.appendChild(card);
   document.body.appendChild(backdrop);
-
-  document.getElementById('jam-select-screen-btn').addEventListener('click', async () => {
-    try {
-      // Prompt user to select screen area (allows window, screen, or tab capture)
-      mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          frameRate: 10,
-          width: 1280,
-          height: 720
-        },
-        audio: false,
-        selfBrowserSurface: "include",
-        preferCurrentTab: true
-      });
-
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
-
-      recordedChunks = [];
-      mediaRecorder = new MediaRecorder(mediaStream, { mimeType });
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          recordedChunks.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: 'video/webm' });
-        
-        if (mediaStream) {
-          mediaStream.getTracks().forEach((t) => t.stop());
-        }
-
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          capturedVideoDataUrl = reader.result;
-          showUploadModal();
-        };
-        reader.readAsDataURL(blob);
-      };
-
-      mediaRecorder.start(1000);
-      isRecording = true;
-
-      // Handle native Stop Sharing toolbar click
-      mediaStream.getVideoTracks()[0].addEventListener('ended', () => {
-        stopRecordingAndShowModal();
-      });
-
-      removeUIElements();
-      renderFloatingWidget();
-
-    } catch (err) {
-      alert('Capture Error: ' + err.message);
-      removeUIElements();
-      isRecording = false;
-      chrome.runtime.sendMessage({ type: 'RESET_STATE' });
-    }
-  });
-
-  document.getElementById('jam-cancel-screen-btn').addEventListener('click', () => {
-    removeUIElements();
-    isRecording = false;
-    chrome.runtime.sendMessage({ type: 'RESET_STATE' });
-  });
 }
 
 // ── RENDER FLOATING RECORDING WIDGET ──────────────────────────────
@@ -397,8 +433,10 @@ function renderFloatingWidget() {
   document.getElementById('jam-widget-stop-btn').addEventListener('click', stopRecordingAndShowModal);
 }
 
-// ── STOP CAPTURE AND INITIATE STOP ───────────────────────────
+// ── STOP CAPTURE AND PROCESS LOCAL RECORDING ───────────────────
 function stopRecordingAndShowModal() {
+  if (!isRecording && !mediaRecorder) return; // Already stopped or never started
+
   isRecording = false;
   if (timerInterval) {
     clearInterval(timerInterval);
@@ -406,17 +444,50 @@ function stopRecordingAndShowModal() {
   }
   recordingStartTime = null;
 
-  removeUIElements();
+  showPreparingOverlay();
 
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
+  const processChunks = () => {
+    // Stop all media tracks to release the stream
+    if (mediaStream) {
+      mediaStream.getTracks().forEach(track => track.stop());
+      mediaStream = null;
+    }
+
+    if (recordedChunks.length === 0) {
+      mediaRecorder = null;
+      chrome.storage.local.set({ recording_state: 'idle' });
+      showUploadModalFallback('No video data was recorded.');
+      return;
+    }
+
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    recordedChunks = [];
+    mediaRecorder = null;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      capturedVideoDataUrl = reader.result;
+      chrome.storage.local.set({ recording_state: 'idle' });
+      showUploadModal();
+    };
+    reader.onerror = () => {
+      chrome.storage.local.set({ recording_state: 'idle' });
+      showUploadModalFallback('Failed to process recorded video.');
+    };
+    reader.readAsDataURL(blob);
+  };
+
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+    // Recorder already stopped (native stop sharing or track ended) — process whatever we have
+    processChunks();
   } else {
-    showUploadModalFallback();
+    mediaRecorder.onstop = processChunks;
+    mediaRecorder.stop();
   }
 }
 
 // ── RENDER FALLBACK UPLOAD MODAL (WHEN MEDIA RECORDER IS LOST) ─────
-function showUploadModalFallback() {
+function showUploadModalFallback(errorMsg = '') {
   removeUIElements();
 
   const backdrop = document.createElement('div');
@@ -426,10 +497,12 @@ function showUploadModalFallback() {
   card.className = 'jam-card';
   
   const defaultTitle = `Logs only: Bug on ${new Date().toLocaleString()}`;
+  const errorDetails = errorMsg ? `<p style="color: #f87171; font-size: 13px; margin-bottom: 15px;">Reason: ${errorMsg}</p>` : '';
   
   card.innerHTML = `
-    <h2 class="jam-title">Recording Interrupted</h2>
-    <p class="jam-text">The page reload or navigation interrupted the screen video. However, we can still upload your captured console logs and network events!</p>
+    <h2 class="jam-title">Recording Finished</h2>
+    <p class="jam-text">Screen video could not be fully captured. However, we can still upload your captured console logs and network events!</p>
+    ${errorDetails}
     <input type="text" class="jam-input" id="jam-title-input" value="${defaultTitle}" />
     <div id="jam-modal-status-area">
       <button class="jam-btn jam-btn-primary" id="jam-upload-logs-btn">Upload Logs Only</button>
@@ -462,7 +535,7 @@ function showUploadModalFallback() {
           <button class="jam-btn jam-btn-primary" id="jam-retry-logs-btn">Retry</button>
           <button class="jam-btn jam-btn-secondary" id="jam-discard-btn-2">Discard</button>
         `;
-        document.getElementById('jam-retry-logs-btn').addEventListener('click', showUploadModalFallback);
+        document.getElementById('jam-retry-logs-btn').addEventListener('click', () => showUploadModalFallback(errorMsg));
         document.getElementById('jam-discard-btn-2').addEventListener('click', () => {
           removeUIElements();
           chrome.runtime.sendMessage({ type: 'RESET_STATE' });

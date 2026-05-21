@@ -3,41 +3,41 @@
 /* Design Tokens & System Customizations */
 :root {
   font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background-color: #0b0f19; /* Ultra-dark slate background */
-  color: #f8fafc; /* Slate 50 text */
+  background-color: #f8fafc; /* Light Slate 50 background */
+  color: #0f172a; /* Slate 900 text */
   margin: 0;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* Custom premium thin scrollbar */
+/* Custom premium thin scrollbar (Light Mode) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.3);
-  backdrop-filter: blur(8px);
+  background: rgba(241, 245, 249, 0.8);
+  border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.6);
 }
 
-/* Glassmorphic Grid Background Glow */
+/* Light Mode Grid Background Glow */
 .bg-grid-glow {
   position: relative;
-  background-size: 50px 50px;
+  background-size: 40px 40px;
   background-image: 
-    linear-gradient(to right, rgba(99, 102, 241, 0.02) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(99, 102, 241, 0.02) 1px, transparent 1px);
+    linear-gradient(to right, rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
 }
 
 .bg-grid-glow::after {
@@ -48,11 +48,11 @@ body {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  background: radial-gradient(circle 800px at 50% -200px, rgba(99, 102, 241, 0.08), transparent 80%);
+  background: radial-gradient(circle 800px at 50% -100px, rgba(99, 102, 241, 0.05), transparent 70%);
   z-index: 0;
 }
 
-/* Shimmer Animation for Skeleton Loaders */
+/* Shimmer Animation for Skeleton Loaders (Light Mode) */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -63,39 +63,39 @@ body {
 }
 
 .animate-shimmer {
-  background: linear-gradient(90deg, rgba(30, 41, 59, 0.5) 25%, rgba(51, 65, 85, 0.5) 50%, rgba(30, 41, 59, 0.5) 75%);
+  background: linear-gradient(90deg, rgba(226, 232, 240, 0.5) 25%, rgba(241, 245, 249, 0.8) 50%, rgba(226, 232, 240, 0.5) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.6s infinite linear;
 }
 
-/* Glassmorphic Panels */
+/* Premium Light Mode Glassmorphic Panels */
 .glass-panel {
-  background: rgba(17, 24, 39, 0.6);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
 .glass-panel-hover {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .glass-panel-hover:hover {
-  background: rgba(17, 24, 39, 0.8);
-  border-color: rgba(99, 102, 241, 0.3);
-  box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.15);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(99, 102, 241, 0.25);
+  box-shadow: 0 12px 25px -8px rgba(99, 102, 241, 0.08);
 }
 
-/* Keyframes for pulse glow */
+/* Pulse animation for active recordings */
 @keyframes recordingPulse {
   0%, 100% {
     opacity: 1;
-    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.25);
   }
   50% {
-    opacity: 0.6;
-    box-shadow: 0 0 5px rgba(239, 68, 68, 0.1);
+    opacity: 0.7;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.05);
   }
 }
 
 .animate-recording {
-  animation: recordingPulse 2s infinite ease-in-out;
+  animation: recordingPulse 2.5s infinite ease-in-out;
 }

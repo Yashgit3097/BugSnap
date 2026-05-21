@@ -52,7 +52,9 @@
     "storage",
     "activeTab",
     "scripting",
-    "tabs"
+    "tabs",
+    "offscreen",
+    "desktopCapture"
   ],
 
   "host_permissions": [

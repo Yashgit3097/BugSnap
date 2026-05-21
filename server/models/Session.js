@@ -1,0 +1,53 @@
+import mongoose from 'mongoose';
+
+const sessionSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    title: {
+      type: String,
+      default: 'Bug Recording',
+    },
+    publicId: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    status: {
+      type: String,
+      enum: ['recording', 'completed', 'failed'],
+      default: 'recording',
+    },
+    startedAt: {
+      type: Date,
+      default: Date.now,
+    },
+    endedAt: {
+      type: Date,
+    },
+    duration: {
+      type: Number, // in seconds
+    },
+    videoUrl: {
+      type: String,
+    },
+    videoPublicId: {
+      type: String,
+    },
+    browserInfo: {
+      browser: String,
+      os: String,
+      screenResolution: String,
+      userAgent: String,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const Session = mongoose.model('Session', sessionSchema);
+export default Session;

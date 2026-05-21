@@ -54,7 +54,8 @@
     "scripting",
     "tabs",
     "offscreen",
-    "desktopCapture"
+    "desktopCapture",
+    "unlimitedStorage"
   ],
 
   "host_permissions": [

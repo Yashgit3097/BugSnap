@@ -26,6 +26,85 @@ function appendEventToStorage(key, item) {
   });
 }
 
+// ── INDEXEDDB FOR VIDEO CHUNKS ──────────────────────────────
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('jam_chunks_db', 1);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('chunks')) {
+        db.createObjectStore('chunks', { autoIncrement: true });
+      }
+    };
+    request.onsuccess = (e) => resolve(e.target.result);
+    request.onerror = (e) => reject(e.target.error);
+  });
+}
+
+function clearChunks() {
+  return openDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('chunks', 'readwrite');
+      const store = tx.objectStore('chunks');
+      const request = store.clear();
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }).catch((err) => {
+    console.error('Failed to clear IndexedDB chunks:', err);
+  });
+}
+
+function addChunk(chunkBase64) {
+  return openDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('chunks', 'readwrite');
+      const store = tx.objectStore('chunks');
+      const request = store.add(chunkBase64);
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }).catch((err) => {
+    console.error('Failed to add chunk to IndexedDB:', err);
+  });
+}
+
+function getCompiledVideo() {
+  return openDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('chunks', 'readonly');
+      const store = tx.objectStore('chunks');
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }).then(async (chunks) => {
+    if (!chunks || chunks.length === 0) {
+      return null;
+    }
+
+    // Convert each base64 string back to a Blob
+    const blobPromises = chunks.map(async (base64Url) => {
+      const res = await fetch(base64Url);
+      return await res.blob();
+    });
+
+    const blobs = await Promise.all(blobPromises);
+    const finalBlob = new Blob(blobs, { type: 'video/webm' });
+
+    // Convert the final Blob back to a base64 Data URL
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(finalBlob);
+    });
+  }).catch((err) => {
+    console.error('Failed to compile video:', err);
+    throw err;
+  });
+}
+
 let offscreenResolver = null;
 
 // Listen for messages from popup.js, content.js, and offscreen.js
@@ -98,8 +177,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 
+  if (request.type === 'RECORDED_CHUNK') {
+    addChunk(request.chunkUrl)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => sendResponse({ error: err.message || err.toString() }));
+    return true;
+  }
+
+  if (request.type === 'GET_COMPILED_VIDEO') {
+    getCompiledVideo()
+      .then((videoDataUrl) => {
+        sendResponse({ videoDataUrl });
+      })
+      .catch((err) => {
+        sendResponse({ error: err.message || err.toString() });
+      });
+    return true; // async
+  }
+
   if (request.type === 'RESET_STATE') {
     chrome.offscreen.closeDocument().catch(() => {});
+    clearChunks().catch(() => {});
     chrome.storage.local.set({
       recording_state: 'idle',
       recording_start_time: null,
@@ -171,6 +269,7 @@ async function handleStartRecording(request, sendResponse) {
   try {
     // Clear any previous recording error
     await chrome.storage.local.remove(['last_recording_error']);
+    await clearChunks();
 
     const stored = await chrome.storage.local.get(['jam_token']);
     const authToken = stored.jam_token;

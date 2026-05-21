@@ -328,6 +328,17 @@ async function startCapture(streamId) {
   mediaRecorder.ondataavailable = (event) => {
     if (event.data && event.data.size > 0) {
       recordedChunks.push(event.data);
+      
+      // Convert chunk to base64 Data URL and send it to the background script
+      // to survive page reloads.
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        chrome.runtime.sendMessage({
+          type: 'RECORDED_CHUNK',
+          chunkUrl: reader.result
+        }).catch((err) => console.warn('Error sending chunk to background:', err));
+      };
+      reader.readAsDataURL(event.data);
     }
   };
 
@@ -454,9 +465,24 @@ function stopRecordingAndShowModal() {
     }
 
     if (recordedChunks.length === 0) {
-      mediaRecorder = null;
-      chrome.storage.local.set({ recording_state: 'idle' });
-      showUploadModalFallback('No video data was recorded.');
+      // Try to get compiled video from background script (survived page reload)
+      chrome.runtime.sendMessage({ type: 'GET_COMPILED_VIDEO' }, (response) => {
+        const lastErr = chrome.runtime.lastError;
+        if (lastErr || !response || !response.videoDataUrl) {
+          mediaRecorder = null;
+          chrome.storage.local.set({ recording_state: 'idle' });
+          showUploadModalFallback(
+            (response && response.error) || 
+            (lastErr && lastErr.message) || 
+            'No video data was recorded (or page was reloaded before capturing frames).'
+          );
+        } else {
+          capturedVideoDataUrl = response.videoDataUrl;
+          mediaRecorder = null;
+          chrome.storage.local.set({ recording_state: 'idle' });
+          showUploadModal();
+        }
+      });
       return;
     }
 

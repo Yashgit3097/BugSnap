@@ -13,16 +13,16 @@ const userActionSchema = new mongoose.Schema(
       required: true,
     },
     element: {
-      type: String, // CSS Selector or descriptive name of the element
+      type: String,
     },
     value: {
-      type: String, // e.g. text entered in an input
+      type: String,
     },
     page: {
-      type: String, // The URL of the page where action occurred
+      type: String,
     },
     time: {
-      type: Number, // Time in milliseconds since recording started
+      type: Number,
       required: true,
     },
   },

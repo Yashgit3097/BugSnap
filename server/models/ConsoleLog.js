@@ -17,19 +17,18 @@ const consoleLogSchema = new mongoose.Schema(
       required: true,
     },
     stack: {
-      type: String, // Optional stack trace
+      type: String,
     },
     time: {
-      type: Number, // Time in milliseconds since recording started
+      type: Number,
       required: true,
     },
   },
   {
-    timestamps: true, // Automatically manages createdAt and updatedAt
+    timestamps: true,
   }
 );
 
-// We add an index for sessionId to quickly fetch all logs for a specific session
 consoleLogSchema.index({ sessionId: 1 });
 
 const ConsoleLog = mongoose.model('ConsoleLog', consoleLogSchema);

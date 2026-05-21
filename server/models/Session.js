@@ -29,7 +29,7 @@ const sessionSchema = new mongoose.Schema(
       type: Date,
     },
     duration: {
-      type: Number, // in seconds
+      type: Number, 
     },
     videoUrl: {
       type: String,

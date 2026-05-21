@@ -9,7 +9,7 @@ import sessionRoutes from './routes/sessionRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import { initWebSocket } from './config/socket.js';
 
-// Load environment variables from .env file FIRST before anything else
+// Load environment variables from .env file
 dotenv.config();
 
 // Connect to MongoDB
@@ -17,24 +17,18 @@ connectDB();
 
 const app = express();
 
-// ── CORS Configuration ────────────────────────────────────────────
-// We allow ALL origins because requests also come from the Chrome extension.
-// Chrome extensions have special origins like "chrome-extension://..."
+// ── CORS Configuration 
 app.use(cors({
-  origin: '*', // In production, lock this to your specific domain
+  origin: '*', 
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ── Body Parsers ──────────────────────────────────────────────────
-// Parse JSON bodies (for most API calls)
+// ── Body Parsers
 app.use(express.json({ limit: '10mb' }));
-// Parse URL-encoded bodies (for form submissions)
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ── Auto-create uploads/ directory ───────────────────────────────
-// The uploads/ folder is needed by Multer to temporarily store
-// video files before uploading them to Cloudinary.
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
   console.log('Created uploads/ directory');
@@ -50,8 +44,7 @@ app.get('/', (req, res) => {
   res.json({ message: 'Jam.dev Clone API is running ✓', status: 'ok' });
 });
 
-// ── Global Error Handler ──────────────────────────────────────────
-// This catches any errors thrown with 'throw new Error(...)' in controllers
+// ── Global Error Handler ───────────────────────────────────────────
 app.use((err, req, res, next) => {
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
   console.error('Server Error:', err.message);

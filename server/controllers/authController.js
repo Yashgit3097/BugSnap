@@ -1,16 +1,7 @@
-import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import { generateToken } from '../utils/generateToken.js';
 
-// Helper to generate JWT
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: '30d',
-  });
-};
-
-// @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public
+//Register a new user
 export const registerUser = async (req, res) => {
   try {
     const { username, email, password } = req.body;
@@ -19,7 +10,6 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide all required fields' });
     }
 
-    // Check if user email or username exists
     const userExists = await User.findOne({
       $or: [{ email: email.toLowerCase() }, { username }],
     });
@@ -28,7 +18,6 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists with this email or username' });
     }
 
-    // Create user (password is hashed in user model pre-save hook)
     const user = await User.create({
       username,
       email: email.toLowerCase(),
@@ -51,9 +40,7 @@ export const registerUser = async (req, res) => {
   }
 };
 
-// @desc    Authenticate user & get token
-// @route   POST /api/auth/login
-// @access  Public
+//Authenticate user & get token
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -62,7 +49,6 @@ export const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide email and password' });
     }
 
-    // Find user by email
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (user && (await user.matchPassword(password))) {
@@ -81,12 +67,9 @@ export const loginUser = async (req, res) => {
   }
 };
 
-// @desc    Get user profile
-// @route   GET /api/auth/profile
-// @access  Private
+//Get user profile
 export const getUserProfile = async (req, res) => {
   try {
-    // req.user has already been set by protect middleware
     const user = await User.findById(req.user._id).select('-password');
     if (user) {
       res.json({

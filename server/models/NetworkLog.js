@@ -19,7 +19,7 @@ const networkLogSchema = new mongoose.Schema(
       type: Number,
     },
     requestHeaders: {
-      type: mongoose.Schema.Types.Mixed, // Allows storing arbitrary JSON object
+      type: mongoose.Schema.Types.Mixed,
     },
     requestBody: {
       type: String,
@@ -31,10 +31,10 @@ const networkLogSchema = new mongoose.Schema(
       type: String,
     },
     duration: {
-      type: Number, // In milliseconds
+      type: Number,
     },
     time: {
-      type: Number, // Time in milliseconds since recording started when request was made
+      type: Number,
       required: true,
     },
   },

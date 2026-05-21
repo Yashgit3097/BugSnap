@@ -3,14 +3,11 @@ import jwt from 'jsonwebtoken';
 
 let io = null;
 
-/**
- * Initializes the Socket.io server using the existing HTTP/HTTPS server instance.
- * @param {import('http').Server} server 
- */
+//Initializes the Socket.io server using the existing HTTP/HTTPS server instance.
 export const initWebSocket = (server) => {
   io = new Server(server, {
     cors: {
-      origin: '*', // Allow all origins for the Chrome Extension and Dashboard
+      origin: '*', 
       methods: ['GET', 'POST', 'PUT', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization']
     }
@@ -24,7 +21,6 @@ export const initWebSocket = (server) => {
         return next(new Error('Authentication error: Token missing'));
       }
 
-      // Verify the JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.userId = decoded.id;
       next();
@@ -49,12 +45,7 @@ export const initWebSocket = (server) => {
   return io;
 };
 
-/**
- * Broadcasts a real-time event to all active Socket.io connections belonging to a specific user.
- * @param {string} userId - The user's MongoDB ObjectId string.
- * @param {string} eventType - The event name (e.g., 'SESSION_CREATED', 'SESSION_COMPLETED').
- * @param {object} data - Payload to send.
- */
+//Broadcasts a real-time event to all active Socket.io connections belonging to a specific user.
 export const broadcastToUser = (userId, eventType, data) => {
   if (!io) {
     console.warn('[Socket.io] Cannot broadcast, Server is not initialized.');

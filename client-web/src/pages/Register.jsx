@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { BugPlay } from 'lucide-react';
+
 
 /**
  * Register Component
@@ -38,7 +38,12 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-800 bg-grid-glow relative">
       <div className="glass-panel p-8 rounded-2xl shadow-sm w-full max-w-md border border-slate-200 bg-white relative z-10">
         <div className="flex justify-center mb-6 text-indigo-600">
-          <BugPlay size={48} />
+          <svg width={48} height={48} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
+            <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
+          </svg>
         </div>
         <h2 className="text-3xl font-bold text-center mb-6 text-slate-800">Create Account</h2>
         {error && <p className="text-rose-605 text-center mb-4 bg-rose-50 border border-rose-100 p-2.5 rounded text-sm font-medium">{error}</p>}

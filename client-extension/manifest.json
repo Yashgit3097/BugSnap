@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Jam.dev Clone Recorder",
+  "name": "DebugSnap Recorder",
   "version": "1.0",
   "description": "Record bugs with screen video, console logs, network requests and user actions.",
 

@@ -1,4 +1,4 @@
-# Jam.dev Clone - Chrome Extension
+# DebugSnap - Chrome Extension
 
 Welcome to the Chrome Extension! This is the tool that lives in your browser and magically records bugs.
 

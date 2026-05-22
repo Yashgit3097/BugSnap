@@ -29,7 +29,7 @@ function appendEventToStorage(key, item) {
 // ── INDEXEDDB FOR VIDEO CHUNKS ──────────────────────────────
 function openDB() {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('jam_chunks_db', 1);
+    const request = indexedDB.open('debugsnap_chunks_db', 1);
     request.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('chunks')) {
@@ -156,7 +156,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'SYNC_AUTH') {
-    chrome.storage.local.set({ jam_token: request.token });
+    chrome.storage.local.set({ debugsnap_token: request.token });
     sendResponse({ ok: true });
     return false;
   }
@@ -271,8 +271,8 @@ async function handleStartRecording(request, sendResponse) {
     await chrome.storage.local.remove(['last_recording_error']);
     await clearChunks();
 
-    const stored = await chrome.storage.local.get(['jam_token']);
-    const authToken = stored.jam_token;
+    const stored = await chrome.storage.local.get(['debugsnap_token']);
+    const authToken = stored.debugsnap_token;
     if (!authToken) {
       sendResponse({ error: 'Please login first' });
       return;
@@ -402,14 +402,14 @@ async function handleNativeStop() {
 async function handleUploadData(request, sendResponse) {
   try {
     const storageData = await chrome.storage.local.get([
-      'jam_token',
+      'debugsnap_token',
       'collected_logs',
       'collected_network',
       'collected_actions',
       'recording_start_time'
     ]);
 
-    const authToken = storageData.jam_token;
+    const authToken = storageData.debugsnap_token;
     if (!authToken) {
       throw new Error('Please login first');
     }
@@ -514,14 +514,14 @@ async function uploadDirectlyFromBackground(videoDataUrl, errorMsg) {
     await chrome.storage.local.set({ recording_state: 'uploading' });
 
     const storageData = await chrome.storage.local.get([
-      'jam_token',
+      'debugsnap_token',
       'collected_logs',
       'collected_network',
       'collected_actions',
       'recording_start_time'
     ]);
 
-    const authToken = storageData.jam_token;
+    const authToken = storageData.debugsnap_token;
     if (!authToken) {
       console.error('No auth token found in background upload.');
       await chrome.storage.local.set({ recording_state: 'idle' });

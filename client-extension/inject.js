@@ -21,12 +21,12 @@
   'use strict';
 
   // Guard: only inject once (in case the script somehow runs twice)
-  if (window.__JAM_INJECTED__) return;
-  window.__JAM_INJECTED__ = true;
+  if (window.__DEBUGSNAP_INJECTED__) return;
+  window.__DEBUGSNAP_INJECTED__ = true;
 
   // ── Helper: Post data to content.js ─────────────────────────
   function emit(type, payload) {
-    window.postMessage({ __JAM_TYPE__: type, payload }, '*');
+    window.postMessage({ __DEBUGSNAP_TYPE__: type, payload }, '*');
   }
 
   // ── Helper: Circular Reference Replacer ─────────────────────
@@ -221,27 +221,27 @@
   const _setRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
-    this._JAM_method = method;
-    this._JAM_url    = url;
-    this._JAM_start  = null;
-    this._JAM_reqHeaders = {};
+    this._DEBUGSNAP_method = method;
+    this._DEBUGSNAP_url    = url;
+    this._DEBUGSNAP_start  = null;
+    this._DEBUGSNAP_reqHeaders = {};
     return _XHROpen.apply(this, [method, url, ...rest]);
   };
 
   XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
-    if (!this._JAM_reqHeaders) {
-      this._JAM_reqHeaders = {};
+    if (!this._DEBUGSNAP_reqHeaders) {
+      this._DEBUGSNAP_reqHeaders = {};
     }
-    this._JAM_reqHeaders[header] = value;
+    this._DEBUGSNAP_reqHeaders[header] = value;
     return _setRequestHeader.apply(this, [header, value]);
   };
 
   XMLHttpRequest.prototype.send = function (body) {
-    this._JAM_start = Date.now();
-    this._JAM_body  = body;
+    this._DEBUGSNAP_start = Date.now();
+    this._DEBUGSNAP_body  = body;
 
     this.addEventListener('loadend', () => {
-      const duration = Date.now() - (this._JAM_start || Date.now());
+      const duration = Date.now() - (this._DEBUGSNAP_start || Date.now());
       
       // Parse response headers
       const responseHeaders = {};
@@ -271,11 +271,11 @@
       }
 
       emit('NETWORK', {
-        url:          this._JAM_url || '',
-        method:       (this._JAM_method || 'GET').toUpperCase(),
+        url:          this._DEBUGSNAP_url || '',
+        method:       (this._DEBUGSNAP_method || 'GET').toUpperCase(),
         status:       this.status,
-        requestHeaders: this._JAM_reqHeaders || {},
-        requestBody:  this._JAM_body ? String(this._JAM_body).substring(0, 1000) : '',
+        requestHeaders: this._DEBUGSNAP_reqHeaders || {},
+        requestBody:  this._DEBUGSNAP_body ? String(this._DEBUGSNAP_body).substring(0, 1000) : '',
         responseHeaders,
         responseBody,
         duration

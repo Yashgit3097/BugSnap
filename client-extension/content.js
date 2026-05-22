@@ -23,106 +23,268 @@ let isRecording = false;
 
 // CSS Stylesheet for custom, elegant, non-intrusive UI widgets
 const CSS_STYLE = `
-  #jam-overlay-backdrop {
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  /* ── Overlay Backdrop ──────────────────────────────────────── */
+  #debugsnap-overlay-backdrop {
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(15, 23, 42, 0.7);
-    backdrop-filter: blur(8px);
-    z-index: 999999;
+    background: rgba(7, 8, 12, 0.75);
+    backdrop-filter: blur(12px) saturate(1.2);
+    -webkit-backdrop-filter: blur(12px) saturate(1.2);
+    z-index: 2147483646;
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  }
-  .jam-card {
-    background: #0f172a;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
-    padding: 32px;
-    width: 400px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    color: #f8fafc;
-    text-align: center;
-  }
-  .jam-title {
-    font-size: 20px; font-weight: 700; margin-bottom: 8px; color: #f1f5f9;
-  }
-  .jam-text {
-    font-size: 14px; color: #94a3b8; margin-bottom: 24px; line-height: 1.5;
-  }
-  .jam-btn {
-    padding: 12px 24px; font-size: 15px; font-weight: 600; border-radius: 8px;
-    border: none; cursor: pointer; transition: all 0.2s ease; width: 100%;
-  }
-  .jam-btn-primary {
-    background: #ff4757; color: white; box-shadow: 0 4px 6px -1px rgba(255, 71, 87, 0.2);
-  }
-  .jam-btn-primary:hover {
-    background: #ff6b81; transform: translateY(-1px);
-  }
-  .jam-btn-secondary {
-    background: rgba(255, 255, 255, 0.1); color: #f1f5f9; margin-top: 10px;
-  }
-  .jam-btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
-  }
-  .jam-input {
-    width: 100%; padding: 12px; border-radius: 8px; background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1); color: white; font-size: 14px;
-    margin-bottom: 20px; box-sizing: border-box; outline: none;
-  }
-  .jam-input:focus {
-    border-color: #ff4757;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    animation: debugsnap-backdrop-in 0.2s ease-out;
   }
 
-  /* Floating Control Panel */
-  #jam-floating-widget {
-    position: fixed;
-    bottom: 24px; right: 24px;
-    background: rgba(15, 23, 42, 0.9);
+  @keyframes debugsnap-backdrop-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  /* ── Modal Card ────────────────────────────────────────────── */
+  .debugsnap-card {
+    background: #0d0d12;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    width: 420px;
+    max-width: calc(100vw - 32px);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.04) inset,
+      0 32px 64px -12px rgba(0,0,0,0.7),
+      0 0 40px -10px rgba(99, 102, 241, 0.15);
+    color: #f1f5f9;
+    text-align: center;
+    animation: debugsnap-card-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .debugsnap-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(99,102,241,0.5), rgba(139,92,246,0.5), transparent);
+  }
+
+  @keyframes debugsnap-card-in {
+    from { opacity: 0; transform: scale(0.92) translateY(12px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* ── Typography ────────────────────────────────────────────── */
+  .debugsnap-title {
+    font-size: 19px;
+    font-weight: 800;
+    margin-bottom: 8px;
+    color: #f8fafc;
+    letter-spacing: -0.3px;
+    line-height: 1.3;
+  }
+
+  .debugsnap-text {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 22px;
+    line-height: 1.6;
+  }
+
+  /* ── Input Field ───────────────────────────────────────────── */
+  .debugsnap-input {
+    width: 100%;
+    padding: 11px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(12px);
-    border-radius: 30px;
-    padding: 8px 16px;
-    display: flex; align-items: center; gap: 12px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-    z-index: 999998;
+    color: #f1f5f9;
+    font-size: 13px;
+    font-family: 'Inter', -apple-system, sans-serif;
+    margin-bottom: 18px;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .debugsnap-input:focus {
+    border-color: rgba(99, 102, 241, 0.5);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+  }
+
+  .debugsnap-input::placeholder {
+    color: #475569;
+  }
+
+  /* ── Buttons ───────────────────────────────────────────────── */
+  .debugsnap-btn {
+    padding: 11px 22px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 100%;
+    font-family: 'Inter', -apple-system, sans-serif;
+    letter-spacing: -0.1px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .debugsnap-btn:active {
+    transform: scale(0.97);
+  }
+
+  .debugsnap-btn-primary {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    box-shadow: 0 4px 16px -4px rgba(99, 102, 241, 0.4);
+  }
+
+  .debugsnap-btn-primary:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 6px 20px -4px rgba(99, 102, 241, 0.55);
+  }
+
+  .debugsnap-btn-secondary {
+    background: rgba(255, 255, 255, 0.06);
+    color: #94a3b8;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    margin-top: 10px;
+  }
+
+  .debugsnap-btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #cbd5e1;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* ── Floating Recording Widget ─────────────────────────────── */
+  #debugsnap-floating-widget {
+    position: fixed;
+    bottom: 22px;
+    right: 22px;
+    background: rgba(10, 10, 16, 0.92);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    border-radius: 50px;
+    padding: 10px 16px 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.04) inset,
+      0 12px 32px -8px rgba(0,0,0,0.6),
+      0 0 24px -8px rgba(99, 102, 241, 0.25);
+    z-index: 2147483645;
     font-family: 'Inter', -apple-system, sans-serif;
     color: white;
     user-select: none;
-  }
-  .jam-dot {
-    width: 10px; height: 10px; border-radius: 50%; background: #ff4757;
-  }
-  .jam-pulse {
-    animation: jam-pulsate 1.5s infinite alternate;
-  }
-  @keyframes jam-pulsate {
-    0% { transform: scale(0.9); opacity: 0.6; }
-    100% { transform: scale(1.1); opacity: 1; }
-  }
-  .jam-timer {
-    font-size: 14px; font-weight: 600; font-family: monospace; min-width: 45px;
-  }
-  .jam-stop-btn {
-    background: #ff4757; color: white; border: none; font-size: 12px; font-weight: 700;
-    padding: 6px 12px; border-radius: 15px; cursor: pointer; transition: background 0.2s;
-  }
-  .jam-stop-btn:hover {
-    background: #ff6b81;
+    animation: debugsnap-widget-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
 
-  /* Spinner */
-  .jam-spinner {
-    border: 3px solid rgba(255, 255, 255, 0.1);
-    border-top: 3px solid #ff4757;
-    border-radius: 50%; width: 24px; height: 24px;
-    animation: jam-spin 1s linear infinite;
-    margin: 0 auto 15px auto;
+  #debugsnap-floating-widget:hover {
+    border-color: rgba(99, 102, 241, 0.45);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.06) inset,
+      0 16px 40px -8px rgba(0,0,0,0.65),
+      0 0 32px -8px rgba(99, 102, 241, 0.35);
   }
-  @keyframes jam-spin {
-    0% { transform: rotate(0deg); }
+
+  @keyframes debugsnap-widget-in {
+    from { opacity: 0; transform: translateY(20px) scale(0.9); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  /* Recording dot */
+  .debugsnap-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #ef4444;
+    flex-shrink: 0;
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  }
+
+  .debugsnap-pulse {
+    animation: debugsnap-pulsate 1.4s ease-in-out infinite;
+  }
+
+  @keyframes debugsnap-pulsate {
+    0%, 100% { transform: scale(1); box-shadow: 0 0 6px rgba(239, 68, 68, 0.5); opacity: 1; }
+    50% { transform: scale(1.3); box-shadow: 0 0 14px rgba(239, 68, 68, 0.7); opacity: 0.75; }
+  }
+
+  /* Timer */
+  .debugsnap-timer {
+    font-size: 14px;
+    font-weight: 700;
+    font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    min-width: 42px;
+    letter-spacing: 1px;
+    background: linear-gradient(135deg, #c7d2fe, #a5b4fc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Divider between timer and button */
+  .debugsnap-widget-sep {
+    width: 1px;
+    height: 16px;
+    background: rgba(255,255,255,0.1);
+    flex-shrink: 0;
+  }
+
+  /* Stop button */
+  .debugsnap-stop-btn {
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: white;
+    border: none;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Inter', -apple-system, sans-serif;
+    padding: 6px 13px;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    letter-spacing: -0.1px;
+    box-shadow: 0 2px 8px -2px rgba(239, 68, 68, 0.4);
+    white-space: nowrap;
+  }
+
+  .debugsnap-stop-btn:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 3px 12px -2px rgba(239, 68, 68, 0.55);
+    transform: scale(1.03);
+  }
+
+  .debugsnap-stop-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* ── Spinner ───────────────────────────────────────────────── */
+  .debugsnap-spinner {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 3px solid rgba(99, 102, 241, 0.15);
+    border-top-color: #6366f1;
+    border-right-color: #8b5cf6;
+    animation: debugsnap-spin 0.85s linear infinite;
+    margin: 0 auto 18px auto;
+  }
+
+  @keyframes debugsnap-spin {
+    0%   { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
   }
 `;
+
 
 // Inject CSS Styles
 (function injectStyles() {
@@ -135,7 +297,7 @@ let recordingStateResolved = false;
 let earlyMessageQueue = [];
 
 function forwardMessage(msg) {
-  if (msg.__JAM_TYPE__ === 'CONSOLE') {
+  if (msg.__DEBUGSNAP_TYPE__ === 'CONSOLE') {
     chrome.runtime.sendMessage({
       type: 'LOG_EVENT',
       eventType: 'console',
@@ -143,7 +305,7 @@ function forwardMessage(msg) {
     });
   }
 
-  if (msg.__JAM_TYPE__ === 'NETWORK') {
+  if (msg.__DEBUGSNAP_TYPE__ === 'NETWORK') {
     chrome.runtime.sendMessage({
       type: 'LOG_EVENT',
       eventType: 'network',
@@ -209,7 +371,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       
       // Remove only the floating widget on non-active tabs.
       // Active tabs showing the upload modal should keep the backdrop/modal.
-      const w = document.getElementById('jam-floating-widget');
+      const w = document.getElementById('debugsnap-floating-widget');
       if (w) w.remove();
     }
   }
@@ -218,7 +380,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 // ── Step 2: Receive events from inject.js ───────────────────────
 window.addEventListener('message', (event) => {
   if (event.source !== window) return;
-  if (!event.data || typeof event.data !== 'object' || !event.data.__JAM_TYPE__) return;
+  if (!event.data || typeof event.data !== 'object' || !event.data.__DEBUGSNAP_TYPE__) return;
 
   if (!recordingStateResolved) {
     earlyMessageQueue.push(event.data);
@@ -252,13 +414,13 @@ function sendAction(type, element, value) {
 }
 
 document.addEventListener('click', (e) => {
-  if (e.target.closest('#jam-overlay-backdrop') || e.target.closest('#jam-floating-widget')) return;
+  if (e.target.closest('#debugsnap-overlay-backdrop') || e.target.closest('#debugsnap-floating-widget')) return;
   const text = e.target.innerText || e.target.value || '';
   sendAction('click', e.target, text.substring(0, 50));
 }, true);
 
 document.addEventListener('input', (e) => {
-  if (e.target.closest('#jam-overlay-backdrop') || e.target.closest('#jam-floating-widget')) return;
+  if (e.target.closest('#debugsnap-overlay-backdrop') || e.target.closest('#debugsnap-floating-widget')) return;
   sendAction('input', e.target, '***'); // mask values
 }, true);
 
@@ -361,14 +523,14 @@ function showPreparingOverlay() {
   removeUIElements();
 
   const backdrop = document.createElement('div');
-  backdrop.id = 'jam-overlay-backdrop';
+  backdrop.id = 'debugsnap-overlay-backdrop';
 
   const card = document.createElement('div');
-  card.className = 'jam-card';
+  card.className = 'debugsnap-card';
   card.innerHTML = `
-    <div class="jam-spinner"></div>
-    <h2 class="jam-title" style="margin-top: 15px;">🎬 Stitching Recording</h2>
-    <p class="jam-text">Processing recorded frames and generating video. Please wait...</p>
+    <div class="debugsnap-spinner"></div>
+    <h2 class="debugsnap-title" style="margin-top: 15px;">🎬 Stitching Recording</h2>
+    <p class="debugsnap-text">Processing recorded frames and generating video. Please wait...</p>
   `;
 
   backdrop.appendChild(card);
@@ -380,14 +542,16 @@ function renderFloatingWidget() {
   removeUIElements();
 
   const widget = document.createElement('div');
-  widget.id = 'jam-floating-widget';
+  widget.id = 'debugsnap-floating-widget';
   widget.style.cursor = 'grab';
 
   widget.innerHTML = `
-    <div class="jam-dot jam-pulse"></div>
-    <div class="jam-timer" id="jam-timer-label">00:00</div>
-    <button class="jam-stop-btn" id="jam-widget-stop-btn">Stop & Upload</button>
+    <div class="debugsnap-dot debugsnap-pulse"></div>
+    <div class="debugsnap-timer" id="debugsnap-timer-label">00:00</div>
+    <div class="debugsnap-widget-sep"></div>
+    <button class="debugsnap-stop-btn" id="debugsnap-widget-stop-btn">⏹ Stop &amp; Upload</button>
   `;
+
 
   document.body.appendChild(widget);
 
@@ -429,7 +593,7 @@ function renderFloatingWidget() {
   
   const initialMin = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
   const initialSec = String(timerSeconds % 60).padStart(2, '0');
-  const initialLabel = document.getElementById('jam-timer-label');
+  const initialLabel = document.getElementById('debugsnap-timer-label');
   if (initialLabel) initialLabel.textContent = `${initialMin}:${initialSec}`;
 
   clearInterval(timerInterval);
@@ -437,11 +601,11 @@ function renderFloatingWidget() {
     timerSeconds++;
     const min = String(Math.floor(timerSeconds / 60)).padStart(2, '0');
     const sec = String(timerSeconds % 60).padStart(2, '0');
-    const label = document.getElementById('jam-timer-label');
+    const label = document.getElementById('debugsnap-timer-label');
     if (label) label.textContent = `${min}:${sec}`;
   }, 1000);
 
-  document.getElementById('jam-widget-stop-btn').addEventListener('click', stopRecordingAndShowModal);
+  document.getElementById('debugsnap-widget-stop-btn').addEventListener('click', stopRecordingAndShowModal);
 }
 
 // ── STOP CAPTURE AND PROCESS LOCAL RECORDING ───────────────────
@@ -517,34 +681,34 @@ function showUploadModalFallback(errorMsg = '') {
   removeUIElements();
 
   const backdrop = document.createElement('div');
-  backdrop.id = 'jam-overlay-backdrop';
+  backdrop.id = 'debugsnap-overlay-backdrop';
 
   const card = document.createElement('div');
-  card.className = 'jam-card';
+  card.className = 'debugsnap-card';
   
   const defaultTitle = `Logs only: Bug on ${new Date().toLocaleString()}`;
   const errorDetails = errorMsg ? `<p style="color: #f87171; font-size: 13px; margin-bottom: 15px;">Reason: ${errorMsg}</p>` : '';
   
   card.innerHTML = `
-    <h2 class="jam-title">Recording Finished</h2>
-    <p class="jam-text">Screen video could not be fully captured. However, we can still upload your captured console logs and network events!</p>
+    <h2 class="debugsnap-title">Recording Finished</h2>
+    <p class="debugsnap-text">Screen video could not be fully captured. However, we can still upload your captured console logs and network events!</p>
     ${errorDetails}
-    <input type="text" class="jam-input" id="jam-title-input" value="${defaultTitle}" />
-    <div id="jam-modal-status-area">
-      <button class="jam-btn jam-btn-primary" id="jam-upload-logs-btn">Upload Logs Only</button>
-      <button class="jam-btn jam-btn-secondary" id="jam-discard-btn">Discard</button>
+    <input type="text" class="debugsnap-input" id="debugsnap-title-input" value="${defaultTitle}" />
+    <div id="debugsnap-modal-status-area">
+      <button class="debugsnap-btn debugsnap-btn-primary" id="debugsnap-upload-logs-btn">Upload Logs Only</button>
+      <button class="debugsnap-btn debugsnap-btn-secondary" id="debugsnap-discard-btn">Discard</button>
     </div>
   `;
 
   backdrop.appendChild(card);
   document.body.appendChild(backdrop);
 
-  document.getElementById('jam-upload-logs-btn').addEventListener('click', async () => {
-    const titleVal = document.getElementById('jam-title-input').value;
-    const statusArea = document.getElementById('jam-modal-status-area');
+  document.getElementById('debugsnap-upload-logs-btn').addEventListener('click', async () => {
+    const titleVal = document.getElementById('debugsnap-title-input').value;
+    const statusArea = document.getElementById('debugsnap-modal-status-area');
     
     statusArea.innerHTML = `
-      <div class="jam-spinner"></div>
+      <div class="debugsnap-spinner"></div>
       <p style="font-size: 14px; color: #94a3b8;">Uploading logs...</p>
     `;
 
@@ -558,11 +722,11 @@ function showUploadModalFallback(errorMsg = '') {
         const err = (res && res.error) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error';
         statusArea.innerHTML = `
           <p style="color: #f87171; font-size: 14px; margin-bottom: 15px;">Upload failed: ${err}</p>
-          <button class="jam-btn jam-btn-primary" id="jam-retry-logs-btn">Retry</button>
-          <button class="jam-btn jam-btn-secondary" id="jam-discard-btn-2">Discard</button>
+          <button class="debugsnap-btn debugsnap-btn-primary" id="debugsnap-retry-logs-btn">Retry</button>
+          <button class="debugsnap-btn debugsnap-btn-secondary" id="debugsnap-discard-btn-2">Discard</button>
         `;
-        document.getElementById('jam-retry-logs-btn').addEventListener('click', () => showUploadModalFallback(errorMsg));
-        document.getElementById('jam-discard-btn-2').addEventListener('click', () => {
+        document.getElementById('debugsnap-retry-logs-btn').addEventListener('click', () => showUploadModalFallback(errorMsg));
+        document.getElementById('debugsnap-discard-btn-2').addEventListener('click', () => {
           removeUIElements();
           chrome.runtime.sendMessage({ type: 'RESET_STATE' });
         });
@@ -570,17 +734,17 @@ function showUploadModalFallback(errorMsg = '') {
         statusArea.innerHTML = `
           <h3 style="font-size: 16px; margin-bottom: 10px; color: #4ade80;">Upload Successful! 🎉</h3>
           <p style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">Your session replay has been created (logs only).</p>
-          <button class="jam-btn jam-btn-primary" id="jam-view-replay-btn">Open Replay</button>
-          <button class="jam-btn jam-btn-secondary" id="jam-dismiss-btn">Dismiss</button>
+          <button class="debugsnap-btn debugsnap-btn-primary" id="debugsnap-view-replay-btn">Open Replay</button>
+          <button class="debugsnap-btn debugsnap-btn-secondary" id="debugsnap-dismiss-btn">Dismiss</button>
         `;
 
-        document.getElementById('jam-view-replay-btn').addEventListener('click', () => {
+        document.getElementById('debugsnap-view-replay-btn').addEventListener('click', () => {
           window.open(`http://localhost:5173/session/${res.publicId}`, '_blank');
           removeUIElements();
           chrome.runtime.sendMessage({ type: 'RESET_STATE' });
         });
 
-        document.getElementById('jam-dismiss-btn').addEventListener('click', () => {
+        document.getElementById('debugsnap-dismiss-btn').addEventListener('click', () => {
           removeUIElements();
           chrome.runtime.sendMessage({ type: 'RESET_STATE' });
         });
@@ -588,7 +752,7 @@ function showUploadModalFallback(errorMsg = '') {
     });
   });
 
-  document.getElementById('jam-discard-btn').addEventListener('click', () => {
+  document.getElementById('debugsnap-discard-btn').addEventListener('click', () => {
     removeUIElements();
     chrome.runtime.sendMessage({ type: 'RESET_STATE' });
   });
@@ -599,32 +763,32 @@ function showUploadModal() {
   removeUIElements();
 
   const backdrop = document.createElement('div');
-  backdrop.id = 'jam-overlay-backdrop';
+  backdrop.id = 'debugsnap-overlay-backdrop';
 
   const card = document.createElement('div');
-  card.className = 'jam-card';
+  card.className = 'debugsnap-card';
   
   const defaultTitle = `Bug on ${new Date().toLocaleString()}`;
   
   card.innerHTML = `
-    <h2 class="jam-title">Save Recording</h2>
-    <p class="jam-text">Add a title description to describe this bug report.</p>
-    <input type="text" class="jam-input" id="jam-title-input" value="${defaultTitle}" />
-    <div id="jam-modal-status-area">
-      <button class="jam-btn jam-btn-primary" id="jam-upload-btn">Upload Recording</button>
-      <button class="jam-btn jam-btn-secondary" id="jam-discard-btn">Discard</button>
+    <h2 class="debugsnap-title">Save Recording</h2>
+    <p class="debugsnap-text">Add a title description to describe this bug report.</p>
+    <input type="text" class="debugsnap-input" id="debugsnap-title-input" value="${defaultTitle}" />
+    <div id="debugsnap-modal-status-area">
+      <button class="debugsnap-btn debugsnap-btn-primary" id="debugsnap-upload-btn">Upload Recording</button>
+      <button class="debugsnap-btn debugsnap-btn-secondary" id="debugsnap-discard-btn">Discard</button>
     </div>
   `;
 
   backdrop.appendChild(card);
   document.body.appendChild(backdrop);
 
-  document.getElementById('jam-upload-btn').addEventListener('click', async () => {
-    const titleVal = document.getElementById('jam-title-input').value;
-    const statusArea = document.getElementById('jam-modal-status-area');
+  document.getElementById('debugsnap-upload-btn').addEventListener('click', async () => {
+    const titleVal = document.getElementById('debugsnap-title-input').value;
+    const statusArea = document.getElementById('debugsnap-modal-status-area');
     
     statusArea.innerHTML = `
-      <div class="jam-spinner"></div>
+      <div class="debugsnap-spinner"></div>
       <p style="font-size: 14px; color: #94a3b8;">Uploading video & logging events...</p>
     `;
 
@@ -638,13 +802,13 @@ function showUploadModal() {
         const err = (res && res.error) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error';
         statusArea.innerHTML = `
           <p style="color: #f87171; font-size: 14px; margin-bottom: 15px;">Upload failed: ${err}</p>
-          <button class="jam-btn jam-btn-primary" id="jam-upload-retry-btn">Retry Upload</button>
-          <button class="jam-btn jam-btn-secondary" id="jam-discard-btn-2">Discard</button>
+          <button class="debugsnap-btn debugsnap-btn-primary" id="debugsnap-upload-retry-btn">Retry Upload</button>
+          <button class="debugsnap-btn debugsnap-btn-secondary" id="debugsnap-discard-btn-2">Discard</button>
         `;
-        document.getElementById('jam-upload-retry-btn').addEventListener('click', () => {
+        document.getElementById('debugsnap-upload-retry-btn').addEventListener('click', () => {
           showUploadModal();
         });
-        document.getElementById('jam-discard-btn-2').addEventListener('click', () => {
+        document.getElementById('debugsnap-discard-btn-2').addEventListener('click', () => {
           removeUIElements();
           chrome.runtime.sendMessage({ type: 'RESET_STATE' });
         });
@@ -652,17 +816,17 @@ function showUploadModal() {
         statusArea.innerHTML = `
           <h3 style="font-size: 16px; margin-bottom: 10px; color: #4ade80;">Upload Successful! 🎉</h3>
           <p style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">Your debugging replay has been created.</p>
-          <button class="jam-btn jam-btn-primary" id="jam-view-replay-btn">Open Replay</button>
-          <button class="jam-btn jam-btn-secondary" id="jam-dismiss-btn">Dismiss</button>
+          <button class="debugsnap-btn debugsnap-btn-primary" id="debugsnap-view-replay-btn">Open Replay</button>
+          <button class="debugsnap-btn debugsnap-btn-secondary" id="debugsnap-dismiss-btn">Dismiss</button>
         `;
 
-        document.getElementById('jam-view-replay-btn').addEventListener('click', () => {
+        document.getElementById('debugsnap-view-replay-btn').addEventListener('click', () => {
           window.open(`http://localhost:5173/session/${res.publicId}`, '_blank');
           removeUIElements();
           chrome.runtime.sendMessage({ type: 'RESET_STATE' });
         });
 
-        document.getElementById('jam-dismiss-btn').addEventListener('click', () => {
+        document.getElementById('debugsnap-dismiss-btn').addEventListener('click', () => {
           removeUIElements();
           chrome.runtime.sendMessage({ type: 'RESET_STATE' });
         });
@@ -670,7 +834,7 @@ function showUploadModal() {
     });
   });
 
-  document.getElementById('jam-discard-btn').addEventListener('click', () => {
+  document.getElementById('debugsnap-discard-btn').addEventListener('click', () => {
     removeUIElements();
     chrome.runtime.sendMessage({ type: 'RESET_STATE' });
   });
@@ -700,26 +864,26 @@ function getBrowserInfo() {
 }
 
 function removeUIElements() {
-  const b = document.getElementById('jam-overlay-backdrop');
+  const b = document.getElementById('debugsnap-overlay-backdrop');
   if (b) b.remove();
-  const w = document.getElementById('jam-floating-widget');
+  const w = document.getElementById('debugsnap-floating-widget');
   if (w) w.remove();
 }
 
 if (window.location.host.includes('localhost:5173') || window.location.host.includes('127.0.0.1:5173')) {
   function syncTokenToExtension() {
-    const raw = localStorage.getItem('jam_user');
+    const raw = localStorage.getItem('debugsnap_user');
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.token) {
-          chrome.storage.local.set({ jam_token: parsed.token });
+          chrome.storage.local.set({ debugsnap_token: parsed.token });
         } else {
-          chrome.storage.local.remove(['jam_token']);
+          chrome.storage.local.remove(['debugsnap_token']);
         }
       } catch (e) {}
     } else {
-      chrome.storage.local.remove(['jam_token']);
+      chrome.storage.local.remove(['debugsnap_token']);
     }
   }
   syncTokenToExtension();

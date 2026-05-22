@@ -1,4 +1,4 @@
-# Jam.dev Clone - Frontend Dashboard
+# DebugSnap - Frontend Dashboard
 
 Welcome to the frontend dashboard! This is the place where users log in, see their recordings, and share them with developers. 
 

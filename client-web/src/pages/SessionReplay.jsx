@@ -2,119 +2,90 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import {
-  BugPlay,
-  Terminal,
-  Network,
-  MousePointer2,
-  Share2,
-  ArrowLeft,
-  Check,
-  Server,
-  FileCode,
-  CornerDownRight,
-  Laptop,
-  Cpu,
-  Monitor,
-  Calendar,
-  Search,
-  AlertTriangle,
-  Info
+  Terminal, Network, MousePointer2, Share2, ArrowLeft, Check,
+  Server, FileCode, CornerDownRight, Laptop, Cpu, Monitor, Calendar,
+  Search, AlertTriangle, Info, Clock, ExternalLink
 } from 'lucide-react';
 
-// List of known serializer types for Console logs
+// ─── Dark DevTools color palette ─────────────────────────────────────────────
+const DT = {
+  bg: '#1e1e2e',   // panel background
+  bgAlt: '#181825',   // alternate row
+  bgActive: '#2a2a3d',   // highlighted row bg
+  bgHover: '#25253a',   // hover state
+  surface: '#252535',   // toolbar/header bg
+  border: '#313149',   // dividers
+  text: '#cdd6f4',   // primary text
+  textDim: '#6c7086',   // muted / timestamps
+  textSub: '#a6adc8',   // secondary text
+  accent: '#89b4fa',   // blue (numbers, method GET)
+  accentHL: 'rgba(137,180,250,0.12)', // active border color bg tint
+  green: '#a6e3a1',   // success / POST
+  red: '#f38ba8',   // error / DELETE
+  yellow: '#f9e2af',   // warn / PATCH PUT
+  purple: '#cba6f7',   // object keys
+  cyan: '#89dceb',   // strings
+  orange: '#fab387',   // actions accent
+  borderHL: '#89b4fa',   // active row left border
+  tag: '#313149',   // badge background
+};
+
+// ─── Console Data Normalizer ───────────────────────────────────────────────────
 const KNOWN_TYPES = ['null', 'undefined', 'number', 'boolean', 'string', 'error', 'array', 'object', 'function', 'symbol'];
 
-/**
- * Normalizes any raw Javascript value or wrapped structure into a standardized shape:
- * { type: string, value: any, stack?: string }
- * This allows recursive rendering of nested structures regardless of their serialization level.
- */
 const normalizeArg = (val) => {
   if (val === null) return { type: 'null', value: null };
   if (val === undefined) return { type: 'undefined', value: undefined };
-
-  // If it's already a wrapped structure matching our schema, return it
-  if (
-    typeof val === 'object' &&
-    val !== null &&
-    'type' in val &&
-    'value' in val &&
-    KNOWN_TYPES.includes(val.type)
-  ) {
-    return val;
-  }
-
-  // Detect and wrap raw Javascript types
+  if (typeof val === 'object' && val !== null && 'type' in val && 'value' in val && KNOWN_TYPES.includes(val.type)) return val;
   if (typeof val === 'number') return { type: 'number', value: val };
   if (typeof val === 'boolean') return { type: 'boolean', value: val };
   if (typeof val === 'string') return { type: 'string', value: val };
   if (Array.isArray(val)) return { type: 'array', value: val };
-
-  // Support native error objects or error-like payloads
   if (val instanceof Error || (typeof val === 'object' && ('stack' in val || 'message' in val))) {
     return { type: 'error', value: val.message || String(val), stack: val.stack };
   }
-
   if (typeof val === 'object') return { type: 'object', value: val };
-
   return { type: 'string', value: String(val) };
 };
 
-/**
- * Returns a brief, flat preview description of an element for rendering inside collapsed parents.
- */
 const renderFlatPreview = (val) => {
-  const norm = normalizeArg(val);
-  if (norm.type === 'null') return 'null';
-  if (norm.type === 'undefined') return 'undefined';
-  if (norm.type === 'number') return String(norm.value);
-  if (norm.type === 'boolean') return String(norm.value);
-  if (norm.type === 'string') return `"${norm.value}"`;
-  if (norm.type === 'error') return 'Error';
-  if (norm.type === 'array') return `Array(${norm.value?.length || 0})`;
-  if (norm.type === 'object') return '{...}';
-  return String(norm.value);
+  const n = normalizeArg(val);
+  if (n.type === 'null') return 'null';
+  if (n.type === 'undefined') return 'undefined';
+  if (n.type === 'number') return String(n.value);
+  if (n.type === 'boolean') return String(n.value);
+  if (n.type === 'string') return `"${n.value}"`;
+  if (n.type === 'error') return 'Error';
+  if (n.type === 'array') return `Array(${n.value?.length || 0})`;
+  if (n.type === 'object') return '{…}';
+  return String(n.value);
 };
 
 /**
- * Renders a single console log argument. Handles recursive expansion for
- * arrays and objects, with specific colors matching browser DevTools in Light Mode.
+ * ConsoleArg — Dark DevTools-style recursive expand/collapse.
+ * Expand/collapse mechanism completely unchanged.
  */
 const ConsoleArg = ({ arg: rawArg, isTopLevel = false }) => {
   const [expanded, setExpanded] = useState(false);
-
-  // Guarantee normalized form
   const arg = normalizeArg(rawArg);
-
-  if (!arg) return <span className="text-slate-400 font-mono">null</span>;
-
+  if (!arg) return <span style={{ color: DT.textDim, fontFamily: 'monospace' }}>null</span>;
   const { type, value } = arg;
 
-  if (type === 'null') {
-    return <span className="text-slate-400 font-mono">null</span>;
-  }
-  if (type === 'undefined') {
-    return <span className="text-slate-400 font-mono">undefined</span>;
-  }
-  if (type === 'number') {
-    return <span className="text-[#1c00cf] font-mono">{String(value)}</span>;
-  }
-  if (type === 'boolean') {
-    return <span className="text-[#1c00cf] font-mono">{String(value)}</span>;
-  }
+  if (type === 'null') return <span style={{ color: DT.textDim, fontFamily: 'monospace' }}>null</span>;
+  if (type === 'undefined') return <span style={{ color: DT.textDim, fontFamily: 'monospace' }}>undefined</span>;
+  if (type === 'number') return <span style={{ color: DT.accent, fontFamily: 'monospace' }}>{String(value)}</span>;
+  if (type === 'boolean') return <span style={{ color: DT.accent, fontFamily: 'monospace' }}>{String(value)}</span>;
   if (type === 'string') {
-    return isTopLevel ? (
-      <span className="text-slate-800 font-mono whitespace-pre-wrap">{String(value)}</span>
-    ) : (
-      <span className="text-[#c41a16] font-mono">"{String(value)}"</span>
-    );
+    return isTopLevel
+      ? <span style={{ color: DT.text, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>{String(value)}</span>
+      : <span style={{ color: DT.cyan, fontFamily: 'monospace' }}>"{String(value)}"</span>;
   }
   if (type === 'error') {
     return (
-      <div className="text-rose-600 font-mono text-xs whitespace-pre-wrap">
-        <div className="font-semibold">{value}</div>
+      <div style={{ color: DT.red, fontFamily: 'monospace', fontSize: 12, whiteSpace: 'pre-wrap' }}>
+        <div style={{ fontWeight: 600 }}>{value}</div>
         {arg.stack && (
-          <pre className="text-[10px] text-rose-500/80 mt-1 pl-3 border-l border-rose-300 overflow-x-auto leading-relaxed select-text font-mono">
+          <pre style={{ fontSize: 10, color: '#f38ba880', marginTop: 4, paddingLeft: 12, borderLeft: `2px solid ${DT.red}`, overflow: 'auto', userSelect: 'text' }}>
             {arg.stack}
           </pre>
         )}
@@ -122,49 +93,39 @@ const ConsoleArg = ({ arg: rawArg, isTopLevel = false }) => {
     );
   }
 
-  // Render arrays with collapsible tree controls
   if (type === 'array') {
     const items = Array.isArray(value) ? value : [];
-
-    const renderPreview = () => {
-      const previews = items.slice(0, 5).map((item, idx) => {
-        const norm = normalizeArg(item);
-        if (norm.type === 'null') return <span key={idx} className="text-slate-400 font-mono">null</span>;
-        if (norm.type === 'undefined') return <span key={idx} className="text-slate-400 font-mono">undefined</span>;
-        if (norm.type === 'number') return <span key={idx} className="text-[#1c00cf] font-mono">{String(norm.value)}</span>;
-        if (norm.type === 'boolean') return <span key={idx} className="text-[#1c00cf] font-mono">{String(norm.value)}</span>;
-        if (norm.type === 'string') return <span key={idx} className="text-[#c41a16] font-mono">"{String(norm.value)}"</span>;
-        if (norm.type === 'array') return <span key={idx} className="text-slate-500 font-mono">Array({norm.value?.length || 0})</span>;
-        if (norm.type === 'object') return <span key={idx} className="text-slate-500 font-mono">{'{...}'}</span>;
-        return <span key={idx} className="text-slate-500 font-mono">{renderFlatPreview(item)}</span>;
-      });
-
-      return (
-        <span className="font-mono cursor-pointer select-none text-slate-800 hover:text-indigo-600 transition-colors" onClick={() => setExpanded(!expanded)}>
-          <span className="text-[10px] text-slate-400 mr-1.5">{expanded ? '▼' : '▶'}</span>
-          <span className="text-slate-550 italic mr-1">Array({items.length})</span>
-          <span className="text-slate-700">[</span>
-          {previews.reduce((acc, x, i) => i === 0 ? [x] : [...acc, <span key={`c-${i}`} className="text-slate-400">, </span>, x], [])}
-          {items.length > 5 && <span className="text-slate-400">, ...</span>}
-          <span className="text-slate-700">]</span>
-        </span>
-      );
-    };
-
+    const toggle = (e) => { e.stopPropagation(); setExpanded(x => !x); };
+    const previews = items.slice(0, 5).map((item, idx) => {
+      const n = normalizeArg(item);
+      if (n.type === 'null') return <span key={idx} style={{ color: DT.textDim, fontFamily: 'monospace' }}>null</span>;
+      if (n.type === 'undefined') return <span key={idx} style={{ color: DT.textDim, fontFamily: 'monospace' }}>undefined</span>;
+      if (n.type === 'number') return <span key={idx} style={{ color: DT.accent, fontFamily: 'monospace' }}>{String(n.value)}</span>;
+      if (n.type === 'boolean') return <span key={idx} style={{ color: DT.accent, fontFamily: 'monospace' }}>{String(n.value)}</span>;
+      if (n.type === 'string') return <span key={idx} style={{ color: DT.cyan, fontFamily: 'monospace' }}>"{String(n.value)}"</span>;
+      return <span key={idx} style={{ color: DT.textSub, fontFamily: 'monospace' }}>{renderFlatPreview(item)}</span>;
+    });
     return (
-      <div className="font-mono inline-block">
-        {renderPreview()}
+      <div style={{ fontFamily: 'monospace', display: 'inline-block' }}>
+        <span onClick={toggle} style={{ cursor: 'pointer', userSelect: 'none', color: DT.text }}>
+          <span style={{ fontSize: 9, color: DT.textDim, marginRight: 4 }}>{expanded ? '▼' : '▶'}</span>
+          <span style={{ color: DT.textSub, fontStyle: 'italic', marginRight: 2 }}>Array({items.length})</span>
+          <span style={{ color: DT.textDim }}>[</span>
+          {previews.reduce((acc, x, i) => i === 0 ? [x] : [...acc, <span key={`s${i}`} style={{ color: DT.textDim }}>, </span>, x], [])}
+          {items.length > 5 && <span style={{ color: DT.textDim }}>, …</span>}
+          <span style={{ color: DT.textDim }}>]</span>
+        </span>
         {expanded && (
-          <div className="pl-4 border-l border-slate-200 mt-1 space-y-1 ml-2">
+          <div style={{ paddingLeft: 16, borderLeft: `1px solid ${DT.border}`, marginTop: 2, marginLeft: 8 }}>
             {items.map((item, index) => (
-              <div key={index} className="flex items-start text-xs">
-                <span className="text-slate-400 mr-2 select-none shrink-0 w-6 text-right">{index}:</span>
+              <div key={index} style={{ display: 'flex', alignItems: 'flex-start', fontSize: 12, marginBottom: 1 }}>
+                <span style={{ color: DT.textDim, marginRight: 8, userSelect: 'none', flexShrink: 0, minWidth: 24, textAlign: 'right' }}>{index}:</span>
                 <ConsoleArg arg={item} />
               </div>
             ))}
-            <div className="flex items-start text-xs">
-              <span className="text-slate-400 mr-2 select-none shrink-0 w-6 text-right">length:</span>
-              <span className="text-[#1c00cf] font-mono">{items.length}</span>
+            <div style={{ display: 'flex', alignItems: 'flex-start', fontSize: 12 }}>
+              <span style={{ color: DT.textDim, marginRight: 8, userSelect: 'none', minWidth: 24, textAlign: 'right' }}>length:</span>
+              <span style={{ color: DT.accent, fontFamily: 'monospace' }}>{items.length}</span>
             </div>
           </div>
         )}
@@ -172,51 +133,43 @@ const ConsoleArg = ({ arg: rawArg, isTopLevel = false }) => {
     );
   }
 
-  // Render objects with collapsible tree controls
   if (type === 'object') {
     const keys = value ? Object.keys(value) : [];
-
-    const renderPreview = () => {
-      const previews = keys.slice(0, 5).map((key) => {
-        const item = value[key];
-        const norm = normalizeArg(item);
-        let previewVal;
-        if (norm.type === 'null') previewVal = <span className="text-slate-400">null</span>;
-        else if (norm.type === 'undefined') previewVal = <span className="text-slate-400">undefined</span>;
-        else if (norm.type === 'number') previewVal = <span className="text-[#1c00cf]">{String(norm.value)}</span>;
-        else if (norm.type === 'boolean') previewVal = <span className="text-[#1c00cf]">{String(norm.value)}</span>;
-        else if (norm.type === 'string') previewVal = <span className="text-[#c41a16]">"{String(norm.value)}"</span>;
-        else if (norm.type === 'array') previewVal = <span className="text-slate-500">Array({norm.value?.length || 0})</span>;
-        else if (norm.type === 'object') previewVal = <span className="text-slate-500">{'{...}'}</span>;
-        else previewVal = <span className="text-slate-500">{renderFlatPreview(item)}</span>;
-
-        return (
-          <span key={key} className="inline-flex items-center">
-            <span className="text-[#881180] mr-1">{key}</span>: {previewVal}
-          </span>
-        );
-      });
-
+    const toggle = (e) => { e.stopPropagation(); setExpanded(x => !x); };
+    const previews = keys.slice(0, 4).map((key) => {
+      const item = value[key];
+      const n = normalizeArg(item);
+      let pv;
+      if (n.type === 'null') pv = <span style={{ color: DT.textDim }}>null</span>;
+      else if (n.type === 'undefined') pv = <span style={{ color: DT.textDim }}>undefined</span>;
+      else if (n.type === 'number' || n.type === 'boolean') pv = <span style={{ color: DT.accent }}>{String(n.value)}</span>;
+      else if (n.type === 'string') pv = <span style={{ color: DT.cyan }}>"{String(n.value)}"</span>;
+      else if (n.type === 'array') pv = <span style={{ color: DT.textSub }}>Array({n.value?.length || 0})</span>;
+      else if (n.type === 'object') pv = <span style={{ color: DT.textSub }}>{'{ … }'}</span>;
+      else pv = <span style={{ color: DT.textSub }}>{renderFlatPreview(item)}</span>;
       return (
-        <span className="font-mono cursor-pointer select-none text-slate-800 hover:text-indigo-600 transition-colors" onClick={() => setExpanded(!expanded)}>
-          <span className="text-[10px] text-slate-400 mr-1.5">{expanded ? '▼' : '▶'}</span>
-          <span className="text-slate-550 italic mr-1">Object</span>
-          <span className="text-slate-700">{'{'}</span>
-          {previews.reduce((acc, x, i) => i === 0 ? [x] : [...acc, <span key={`c-${i}`} className="text-slate-400">, </span>, x], [])}
-          {keys.length > 5 && <span className="text-slate-400">, ...</span>}
-          <span className="text-slate-700">{'}'}</span>
+        <span key={key} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+          <span style={{ color: DT.purple }}>{key}</span>
+          <span style={{ color: DT.textDim }}>: </span>
+          {pv}
         </span>
       );
-    };
-
+    });
     return (
-      <div className="font-mono inline-block">
-        {renderPreview()}
+      <div style={{ fontFamily: 'monospace', display: 'inline-block' }}>
+        <span onClick={toggle} style={{ cursor: 'pointer', userSelect: 'none', color: DT.text }}>
+          <span style={{ fontSize: 9, color: DT.textDim, marginRight: 4 }}>{expanded ? '▼' : '▶'}</span>
+          <span style={{ color: DT.textSub, fontStyle: 'italic', marginRight: 2 }}>Object</span>
+          <span style={{ color: DT.textDim }}>{'{'}</span>
+          {previews.reduce((acc, x, i) => i === 0 ? [x] : [...acc, <span key={`s${i}`} style={{ color: DT.textDim }}>, </span>, x], [])}
+          {keys.length > 4 && <span style={{ color: DT.textDim }}>, …</span>}
+          <span style={{ color: DT.textDim }}>{'}'}</span>
+        </span>
         {expanded && (
-          <div className="pl-4 border-l border-slate-200 mt-1 space-y-1 ml-2">
+          <div style={{ paddingLeft: 16, borderLeft: `1px solid ${DT.border}`, marginTop: 2, marginLeft: 8 }}>
             {keys.map((key) => (
-              <div key={key} className="flex items-start text-xs">
-                <span className="text-[#881180] mr-2 select-none shrink-0">{key}:</span>
+              <div key={key} style={{ display: 'flex', alignItems: 'flex-start', fontSize: 12, marginBottom: 1 }}>
+                <span style={{ color: DT.purple, marginRight: 8, userSelect: 'none', flexShrink: 0 }}>{key}:</span>
                 <ConsoleArg arg={value[key]} />
               </div>
             ))}
@@ -226,15 +179,16 @@ const ConsoleArg = ({ arg: rawArg, isTopLevel = false }) => {
     );
   }
 
-  return <span className="text-slate-800 font-mono">{String(value || rawArg)}</span>;
+  return <span style={{ color: DT.text, fontFamily: 'monospace' }}>{String(value || rawArg)}</span>;
 };
 
+// ─── Main Component ────────────────────────────────────────────────────────────
 const SessionReplay = () => {
   const { publicId } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0); // in milliseconds
-  const [activeTab, setActiveTab] = useState('console'); // console, network, actions
+  const [currentTime, setCurrentTime] = useState(0);
+  const [activeTab, setActiveTab] = useState('console');
   const [selectedNetworkReq, setSelectedNetworkReq] = useState(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [consoleFilter, setConsoleFilter] = useState('');
@@ -244,540 +198,551 @@ const SessionReplay = () => {
   const consoleContainerRef = useRef(null);
   const networkContainerRef = useRef(null);
   const actionsContainerRef = useRef(null);
+  const activeLogRef = useRef(null);
+  const activeNetRef = useRef(null);
+  const activeActRef = useRef(null);
+  useEffect(() => {
+    axios.get(`http://localhost:5000/api/sessions/public/${publicId}`)
+      .then(r => {
+        console.log("Fetched session:", r.data);
+        setData(r.data);
+      })
+      .catch(e => console.error('Failed to fetch session', e))
+      .finally(() => setLoading(false));
+  }, [publicId]);
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) setCurrentTime(videoRef.current.currentTime * 1000);
+  };
+
+  const formatTime = (ms) => {
+    const s = Math.floor(ms / 1000);
+    const m = String(Math.floor(s / 60)).padStart(2, '0');
+    const sec = String(s % 60).padStart(2, '0');
+    const t = Math.floor((ms % 1000) / 100);
+    return `${m}:${sec}.${t}`;
+  };
+
+  const handleShareClick = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/session/${publicId}`)
+      .then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); });
+  };
+
+  const renderJSONPayload = (val) => {
+    if (!val) return <span style={{ color: DT.textDim, fontStyle: 'italic', fontSize: 11 }}>Empty</span>;
+    try {
+      const parsed = typeof val === 'string' ? JSON.parse(val) : val;
+      return (
+        <pre style={{
+          fontSize: 11, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace",
+          background: DT.bgAlt, border: `1px solid ${DT.border}`, borderRadius: 6,
+          padding: '10px 12px', overflowX: 'auto', whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all', color: DT.text, lineHeight: 1.6, margin: 0,
+        }}>
+          {JSON.stringify(parsed, null, 2)}
+        </pre>
+      );
+    } catch {
+      return (
+        <pre style={{
+          fontSize: 11, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace",
+          background: DT.bgAlt, border: `1px solid ${DT.border}`, borderRadius: 6,
+          padding: '10px 12px', overflowX: 'auto', whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all', color: DT.text, lineHeight: 1.6, margin: 0,
+        }}>
+          {String(val)}
+        </pre>
+      );
+    }
+  };
 
   const renderConsoleLog = (log) => {
     try {
       if (log.message.startsWith('[') && log.message.endsWith(']')) {
-        const parsedArgs = JSON.parse(log.message);
-        if (Array.isArray(parsedArgs)) {
+        const args = JSON.parse(log.message);
+        if (Array.isArray(args)) {
           return (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 select-text">
-              {parsedArgs.map((arg, idx) => (
-                <ConsoleArg key={idx} arg={arg} isTopLevel={true} />
-              ))}
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0 10px', userSelect: 'text' }}>
+              {args.map((arg, idx) => <ConsoleArg key={idx} arg={arg} isTopLevel={true} />)}
             </div>
           );
         }
       }
-    } catch (e) {
-      // Fallback
-    }
-
-    return <div className="break-all whitespace-pre-wrap select-text">{log.message}</div>;
+    } catch { /* fallthrough */ }
+    return <div style={{ wordBreak: 'break-all', whiteSpace: 'pre-wrap', userSelect: 'text', color: DT.text }}>{log.message}</div>;
   };
 
-  useEffect(() => {
-    const fetchSessionData = async () => {
-      try {
-        const response = await axios.get(`http://localhost:5000/api/sessions/public/${publicId}`);
-        setData(response.data);
-        console.log('Fetched session data:', response.data);
-      } catch (error) {
-        console.error('Failed to fetch session', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSessionData();
-  }, [publicId]);
-
-  // Update currentTime state as the video plays
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      setCurrentTime(videoRef.current.currentTime * 1000);
-    }
-  };
-
-  const formatVideoTime = (ms) => {
-    const totalSec = Math.floor(ms / 1000);
-    const min = String(Math.floor(totalSec / 60)).padStart(2, '0');
-    const sec = String(totalSec % 60).padStart(2, '0');
-    const tenths = Math.floor((ms % 1000) / 100);
-    return `${min}:${sec}.${tenths}`;
-  };
-
-  const handleShareClick = () => {
-    const shareUrl = `${window.location.origin}/session/${publicId}`;
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      setShareCopied(true);
-      setTimeout(() => setShareCopied(false), 2000);
-    });
-  };
-
-  // Helper to safely display JSON payloads in Light Mode
-  const renderJSONPayload = (val) => {
-    if (!val) return <span className="text-slate-400 italic text-[11px]">Empty</span>;
-    try {
-      const parsed = typeof val === 'string' ? JSON.parse(val) : val;
-      return <pre className="text-[11px] text-slate-800 font-mono overflow-x-auto p-3 bg-slate-50 rounded-xl border border-slate-200 break-all whitespace-pre-wrap leading-relaxed">{JSON.stringify(parsed, null, 2)}</pre>;
-    } catch {
-      return <pre className="text-[11px] text-slate-800 font-mono overflow-x-auto p-3 bg-slate-50 rounded-xl border border-slate-200 break-all whitespace-pre-wrap leading-relaxed">{String(val)}</pre>;
-    }
-  };
-
+  // Data
   const session = data?.session;
   const logs = data?.logs || [];
   const networkRequests = data?.networkRequests || [];
   const actions = data?.actions || [];
 
-  // Filter items based on current video timestamp
-  const visibleLogs = logs
-    .filter((log) => log.time <= currentTime)
-    .filter((log) => log.message.toLowerCase().includes(consoleFilter.toLowerCase()));
+  const filteredLogs = logs.filter(l => l.message.toLowerCase().includes(consoleFilter.toLowerCase()));
+  const filteredNetwork = networkRequests.filter(r => r.url.toLowerCase().includes(networkFilter.toLowerCase()));
 
-  const visibleNetwork = networkRequests
-    .filter((req) => req.time <= currentTime)
-    .filter((req) => req.url.toLowerCase().includes(networkFilter.toLowerCase()));
+  // Active index (last item with time <= currentTime)
+  const activeLogIndex = (() => {
+    let b = -1;
+    for (let i = 0; i < filteredLogs.length; i++) { if (filteredLogs[i].time <= currentTime) b = i; else break; }
+    return b;
+  })();
+  const activeNetIndex = (() => {
+    let b = -1;
+    for (let i = 0; i < filteredNetwork.length; i++) { if (filteredNetwork[i].time <= currentTime) b = i; else break; }
+    return b;
+  })();
+  const activeActIndex = (() => {
+    let b = -1;
+    for (let i = 0; i < actions.length; i++) { if (actions[i].time <= currentTime) b = i; else break; }
+    return b;
+  })();
 
-  const visibleActions = actions.filter((act) => act.time <= currentTime);
-
-  // Auto-scroll list panels to follow playback
+  // Auto-scroll to active
   useEffect(() => {
-    if (activeTab === 'console' && consoleContainerRef.current) {
-      consoleContainerRef.current.scrollTop = consoleContainerRef.current.scrollHeight;
-    }
-  }, [visibleLogs.length, activeTab]);
-
+    if (activeTab === 'console' && activeLogRef.current)
+      activeLogRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeLogIndex, activeTab]);
   useEffect(() => {
-    if (activeTab === 'network' && networkContainerRef.current && !selectedNetworkReq) {
-      networkContainerRef.current.scrollTop = networkContainerRef.current.scrollHeight;
-    }
-  }, [visibleNetwork.length, activeTab, selectedNetworkReq]);
-
+    if (activeTab === 'network' && activeNetRef.current && !selectedNetworkReq)
+      activeNetRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeNetIndex, activeTab, selectedNetworkReq]);
   useEffect(() => {
-    if (activeTab === 'actions' && actionsContainerRef.current) {
-      actionsContainerRef.current.scrollTop = actionsContainerRef.current.scrollHeight;
-    }
-  }, [visibleActions.length, activeTab]);
+    if (activeTab === 'actions' && activeActRef.current)
+      activeActRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [activeActIndex, activeTab]);
 
+  // ── Loading ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-center items-center font-sans space-y-4">
-        <div className="w-12 h-12 rounded-2xl border-4 border-indigo-100 border-t-indigo-600 animate-spin"></div>
-        <span className="text-sm font-semibold tracking-wider uppercase text-slate-500">Loading session replay data...</span>
+      <div style={{ minHeight: '100vh', background: '#0f0f1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <style>{`@keyframes spin{to{transform:rotate(360deg);}}`}</style>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(137,180,250,0.15)', borderTopColor: '#89b4fa', borderRightColor: '#cba6f7', animation: 'spin 0.85s linear infinite', margin: '0 auto 14px' }} />
+          <p style={{ color: '#6c7086', fontSize: 12, fontFamily: 'Inter,sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Loading session…</p>
+        </div>
       </div>
     );
   }
 
+  // ── Not Found ─────────────────────────────────────────────────────
   if (!data || !data.session) {
     return (
-      <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col justify-center items-center font-sans space-y-6">
-        <div className="p-4.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-600">
-          <AlertTriangle size={32} />
+      <div style={{ minHeight: '100vh', background: '#0f0f1a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+        <div style={{ padding: 20, background: 'rgba(243,139,168,0.1)', border: '1px solid rgba(243,139,168,0.3)', borderRadius: 16, color: '#f38ba8' }}><AlertTriangle size={36} /></div>
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#cdd6f4', marginBottom: 8 }}>Session Not Found</h2>
+          <p style={{ color: '#6c7086', fontSize: 14 }}>This bug report may have expired or been deleted.</p>
         </div>
-        <div className="text-center">
-          <h2 className="text-lg font-bold text-slate-800 mb-1">Session Not Found</h2>
-          <p className="text-slate-500 text-sm">The requested bug report link may have expired or been deleted.</p>
-        </div>
-        <Link to="/" className="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow">
-          Back to Dashboard
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: 'white', fontWeight: 600, fontSize: 13, padding: '10px 20px', borderRadius: 12, textDecoration: 'none' }}>
+          <ArrowLeft size={14} /> Back to Dashboard
         </Link>
       </div>
     );
   }
 
+  const methodColor = (m) => {
+    if (m === 'POST') return DT.green;
+    if (m === 'DELETE') return DT.red;
+    if (m === 'PUT' || m === 'PATCH') return DT.yellow;
+    return DT.accent;
+  };
+
+  // ── Main View ─────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col h-screen overflow-hidden font-sans relative">
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#0f0f1a', fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", WebkitFontSmoothing: 'antialiased' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(137,180,250,0.15); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(137,180,250,0.35); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulseGlow {
+          0%,100% { box-shadow: 0 0 0 0 rgba(137,180,250,0.4); }
+          50%      { box-shadow: 0 0 0 4px rgba(137,180,250,0); }
+        }
+        @keyframes hlFlash {
+          0%   { background-color: rgba(137,180,250,0.18); }
+          100% { background-color: rgba(137,180,250,0.06); }
+        }
+        @keyframes hlFlashAction {
+          0%   { background-color: rgba(137,180,250,0.2); }
+          100% { background-color: rgba(137,180,250,0.06); }
+        }
+      `}</style>
 
-      {/* Sleek Top Control Bar */}
-      <header className="bg-white px-6 py-4 flex justify-between items-center shrink-0 border-b border-slate-200 z-20 shadow-sm">
-        <div className="flex items-center space-x-4">
-          <Link to="/" className="text-slate-500 hover:text-slate-800 p-2 rounded-xl hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200" title="Back to dashboard">
-            <ArrowLeft size={16} />
+      {/* ════ HEADER ════ */}
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 52, flexShrink: 0, background: '#14141f', borderBottom: '1px solid rgba(255,255,255,0.06)', zIndex: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', color: '#6c7086', textDecoration: 'none', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#cdd6f4'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#6c7086'; }}>
+            <ArrowLeft size={14} />
           </Link>
-
-          <div className="flex flex-col">
-            <div className="flex items-center space-x-2">
-              <BugPlay size={20} className="text-indigo-600" />
-              <h1 className="text-sm font-bold text-slate-800 tracking-tight">{session.title}</h1>
+          <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.06)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#89b4fa' }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
+                <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
+                <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
+              </svg>
             </div>
-            <div className="text-[10px] text-slate-500 mt-0.5 flex items-center space-x-3">
-              <span className="flex items-center space-x-1">
-                <Calendar size={10} />
-                <span>{new Date(session.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
-              </span>
+            <div>
+              <h1 style={{ fontSize: 13, fontWeight: 700, color: '#cdd6f4', margin: 0, lineHeight: 1.2 }}>{session.title}</h1>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                <span style={{ fontSize: 10, color: '#6c7086', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <Calendar size={9} />{new Date(session.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+                </span>
+                {session.browserInfo && (
+                  <span style={{ fontSize: 10, color: '#6c7086', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <Laptop size={9} />{session.browserInfo.browser} · {session.browserInfo.os}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <button
-            onClick={handleShareClick}
-            className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-md"
-          >
-            {shareCopied ? (
-              <>
-                <Check size={13} />
-                <span>Copied Replay Link!</span>
-              </>
-            ) : (
-              <>
-                <Share2 size={13} />
-                <span>Share Bug Report</span>
-              </>
-            )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {[
+            { label: `${logs.length} logs`, color: DT.accent },
+            { label: `${networkRequests.length} requests`, color: DT.green },
+            { label: `${actions.length} actions`, color: DT.orange },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#6c7086', fontFamily: 'monospace', fontWeight: 600 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, display: 'inline-block' }} />
+              {label}
+            </div>
+          ))}
+          <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.06)' }} />
+          <button onClick={handleShareClick} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: shareCopied ? 'rgba(166,227,161,0.12)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: shareCopied ? '1px solid rgba(166,227,161,0.3)' : 'none', color: shareCopied ? DT.green : 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', outline: 'none', transition: 'all 0.2s', fontFamily: 'inherit' }}>
+            {shareCopied ? <><Check size={12} /> Copied!</> : <><Share2 size={12} /> Share</>}
           </button>
         </div>
       </header>
 
-      {/* Split View Viewport */}
-      <div className="flex-1 flex min-h-0 bg-slate-50 z-10">
+      {/* ════ BODY — fixed 50/50 columns ════ */}
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* Left Panel: Video Replay Frame */}
-        <div className="w-1/2 p-6 flex flex-col min-h-0 justify-between select-none">
-          <div className="flex-1 bg-black border border-slate-200 rounded-3xl overflow-hidden flex flex-col shadow-lg relative">
-
-            {/* Player header banner */}
-            <div className="bg-slate-900 px-5 py-3 text-xs text-slate-300 flex items-center justify-between">
-              <div className="flex items-center space-x-2 font-medium">
-                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                <span>Interactions Replay Screen</span>
-              </div>
-              <div className="flex items-center space-x-1.5 font-mono bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 text-[10px] font-semibold text-slate-400">
-                <Laptop size={10} className="text-indigo-400" />
-                <span>{session.browserInfo?.browser || 'Chrome'} • {session.browserInfo?.os || 'OS'}</span>
-              </div>
+        {/* ═══ LEFT: VIDEO ═══ */}
+        <div style={{ width: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#0f0f1a', borderRight: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+          {/* Player titlebar */}
+          <div style={{ background: '#14141f', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {['#ff5f57', '#febc2e', '#28c840'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.75 }} />)}
             </div>
-
-            {/* Render video element */}
-            <div className="flex-1 bg-black relative flex items-center justify-center">
-              <video
-                ref={videoRef}
-                src={session.videoUrl}
-                controls
-                onTimeUpdate={handleTimeUpdate}
-                className="w-full h-full object-contain"
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#6c7086', fontFamily: 'monospace' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#89b4fa', display: 'inline-block', animation: 'pulseGlow 2s infinite' }} />
+              Session Replay
             </div>
-
-            {/* Synchronized HUD Time overlay */}
-            <div className="absolute top-14 right-4 bg-black/80 border border-slate-800 px-3 py-1.5 rounded-xl font-mono text-xs text-indigo-400 font-bold shadow-lg">
-              HUD Tracker: {formatVideoTime(currentTime)}
+            <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#89b4fa', background: 'rgba(137,180,250,0.08)', border: '1px solid rgba(137,180,250,0.18)', borderRadius: 5, padding: '2px 8px', letterSpacing: 1 }}>
+              {formatTime(currentTime)}
             </div>
           </div>
 
-          {/* User Environment Specifications Info Card */}
+          {/* Video — fills remaining space */}
+          <div style={{ flex: 1, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <video ref={videoRef} src={session.videoUrl} controls onTimeUpdate={handleTimeUpdate}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+          </div>
+
+          {/* Env bar */}
           {session.browserInfo && (
-            <div className="glass-panel p-4.5 rounded-2xl border border-slate-200 shadow-sm mt-6 flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
-                  <Laptop size={16} />
-                </div>
+            <div style={{ flexShrink: 0, padding: '7px 14px', borderTop: '1px solid rgba(255,255,255,0.05)', background: '#14141f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ padding: 6, borderRadius: 7, background: 'rgba(137,180,250,0.08)', border: '1px solid rgba(137,180,250,0.15)', color: '#89b4fa' }}><Laptop size={11} /></div>
                 <div>
-                  <h4 className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Environment Info</h4>
-                  <p className="text-xs font-semibold text-slate-800 mt-0.5">{session.browserInfo.os || 'OS'} Client Device</p>
+                  <div style={{ fontSize: 9, color: '#4b5060', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Environment</div>
+                  <div style={{ fontSize: 11, color: '#a6adc8', fontWeight: 600, marginTop: 1 }}>{session.browserInfo.os || 'OS'}</div>
                 </div>
               </div>
-
-              <div className="flex gap-4">
-                <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-mono">
-                  <Cpu size={12} className="text-indigo-650" />
-                  <span>Browser: <span className="text-slate-700 font-semibold">{session.browserInfo.browser || 'N/A'}</span></span>
+              <div style={{ display: 'flex', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6c7086' }}>
+                  <Cpu size={10} style={{ color: '#89b4fa' }} />
+                  <span style={{ color: '#a6adc8', fontWeight: 600 }}>{session.browserInfo.browser || 'N/A'}</span>
                 </div>
-                <div className="flex items-center space-x-1.5 text-xs text-slate-500 font-mono">
-                  <Monitor size={12} className="text-indigo-650" />
-                  <span>Screen: <span className="text-slate-700 font-semibold">{session.browserInfo.screen || 'N/A'}</span></span>
-                </div>
+                {session.browserInfo.screen && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6c7086' }}>
+                    <Monitor size={10} style={{ color: '#89b4fa' }} />
+                    <span style={{ color: '#a6adc8', fontWeight: 600 }}>{session.browserInfo.screen}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
 
-        {/* Right Panel: Integrated Web DevTools */}
-        <div className="w-1/2 flex flex-col min-h-0 border-l border-slate-200 bg-white">
+        {/* ═══ RIGHT: DARK DEVTOOLS ═══ */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: DT.bg, overflow: 'hidden' }}>
 
-          {/* Glassmorphic Tabs Select header */}
-          <div className="bg-slate-100 border-b border-slate-200 flex items-center px-4 shrink-0 justify-between">
-            <div className="flex items-center py-0">
+          {/* Tab bar */}
+          <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', background: DT.surface, borderBottom: `1px solid ${DT.border}`, flexShrink: 0, paddingLeft: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'stretch' }}>
               {[
-                { id: 'console', icon: Terminal, label: 'Console logs', count: visibleLogs.length },
-                { id: 'network', icon: Network, label: 'Network', count: visibleNetwork.length },
-                { id: 'actions', icon: MousePointer2, label: 'Actions', count: visibleActions.length }
-              ].map((tab) => {
-                const Icon = tab.icon;
+                { id: 'console', label: 'Console', count: logs.length },
+                { id: 'network', label: 'Network', count: networkRequests.length },
+                { id: 'actions', label: 'Actions', count: actions.length },
+              ].map(tab => {
                 const isActive = activeTab === tab.id;
                 return (
-                  <button
-                    key={tab.id}
-                    onClick={() => { setActiveTab(tab.id); setSelectedNetworkReq(null); }}
-                    className={`flex items-center space-x-2 text-xs font-semibold px-4 py-3 border-r border-slate-200 transition-all focus:outline-none ${isActive
-                        ? 'bg-white text-slate-800 border-b border-b-white font-bold'
-                        : 'text-slate-600 hover:text-slate-800 hover:bg-slate-200/50'
-                      }`}
-                    style={isActive ? { marginBottom: '-1px', borderBottom: '1px solid white' } : {}}
-                  >
-                    <Icon size={12} />
-                    <span>{tab.label}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${isActive ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-200 text-slate-600'}`}>
+                  <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSelectedNetworkReq(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 16px', height: 36, fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? DT.accent : DT.textDim, background: isActive ? DT.bg : 'transparent', border: 'none', borderBottom: isActive ? `2px solid ${DT.accent}` : `2px solid transparent`, cursor: 'pointer', outline: 'none', transition: 'all 0.15s', fontFamily: 'Inter,sans-serif' }}>
+                    {tab.label}
+                    <span style={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: isActive ? 'rgba(137,180,250,0.12)' : DT.tag, color: isActive ? DT.accent : DT.textDim }}>
                       {tab.count}
                     </span>
                   </button>
                 );
               })}
             </div>
-
-            <div className="text-[10px] text-slate-500 font-bold uppercase tracking-wider select-none pr-2 font-mono">
-              Live Console sync
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingRight: 12, fontSize: 10, color: DT.textDim, fontFamily: 'monospace', userSelect: 'none' }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: DT.accent, display: 'inline-block', animation: 'pulseGlow 2s infinite' }} />
+              {formatTime(currentTime)}
             </div>
           </div>
 
-          {/* Active Tab Panel Frame */}
-          <div className="flex-1 flex flex-col min-h-0 p-5 bg-white">
-
-            {/* CONSOLE LOGGER PANEL */}
-            {activeTab === 'console' && (
-              <div className="flex-1 flex flex-col min-h-0 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                {/* Search / Filter logs */}
-                <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center relative">
-                  <Search size={12} className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="text"
-                    placeholder="Filter console list messages..."
-                    value={consoleFilter}
-                    onChange={(e) => setConsoleFilter(e.target.value)}
-                    className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400/50"
-                  />
+          {/* ─── CONSOLE PANEL ─── */}
+          {activeTab === 'console' && (
+            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+              {/* Toolbar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: DT.surface, borderBottom: `1px solid ${DT.border}`, flexShrink: 0 }}>
+                <div style={{ position: 'relative', flex: 1 }}>
+                  <Search size={11} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: DT.textDim }} />
+                  <input type="text" placeholder="Filter" value={consoleFilter} onChange={e => setConsoleFilter(e.target.value)}
+                    style={{ width: '100%', height: 24, paddingLeft: 26, paddingRight: 8, background: DT.bg, border: `1px solid ${DT.border}`, borderRadius: 4, fontSize: 12, color: DT.text, outline: 'none', fontFamily: 'Inter,sans-serif' }} />
                 </div>
-                {/* Scrolling logger body */}
-                <div
-                  ref={consoleContainerRef}
-                  className="flex-1 overflow-y-auto custom-scrollbar bg-white divide-y divide-slate-100"
-                >
-                  {visibleLogs.length === 0 ? (
-                    <div className="text-slate-400 text-xs font-mono text-center mt-12 py-6">
-                      {consoleFilter ? 'No matching logs found.' : 'No console messages output up to this timestamp.'}
+                <div style={{ fontSize: 10, color: DT.textDim, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                  {activeLogIndex >= 0 ? activeLogIndex + 1 : 0} / {filteredLogs.length}
+                </div>
+              </div>
+
+              {/* Log rows */}
+              <div ref={consoleContainerRef} style={{ flex: 1, overflowY: 'auto', background: DT.bg }}>
+                {filteredLogs.length === 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: DT.textDim, gap: 8 }}>
+                    <Terminal size={20} style={{ opacity: 0.35 }} />
+                    <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{consoleFilter ? 'No matching messages.' : 'No console messages captured.'}</span>
+                  </div>
+                ) : (
+                  filteredLogs.map((log, i) => {
+                    const isErr = log.type === 'error';
+                    const isWarn = log.type === 'warn';
+                    const isActive = i === activeLogIndex;
+
+                    const rowBg = isActive
+                      ? (isErr ? 'rgba(243,139,168,0.08)' : isWarn ? 'rgba(249,226,175,0.07)' : DT.accentHL)
+                      : (isErr ? 'rgba(243,139,168,0.04)' : isWarn ? 'rgba(249,226,175,0.04)' : (i % 2 === 0 ? DT.bg : DT.bgAlt));
+
+                    const borderLeft = isActive
+                      ? (isErr ? `3px solid ${DT.red}` : isWarn ? `3px solid ${DT.yellow}` : `3px solid ${DT.borderHL}`)
+                      : '3px solid transparent';
+
+                    return (
+                      <div key={log._id || i} ref={isActive ? activeLogRef : null}
+                        style={{ display: 'flex', alignItems: 'flex-start', minHeight: 22, borderLeft, background: rowBg, borderBottom: `1px solid ${DT.bgAlt}`, transition: 'background 0.35s ease', animation: isActive ? 'hlFlash 1.5s ease-out forwards' : 'none' }}>
+                        {/* Timestamp */}
+                        <span style={{ fontSize: 9, fontFamily: 'monospace', color: DT.textDim, padding: '4px 6px', flexShrink: 0, whiteSpace: 'nowrap', borderRight: `1px solid ${DT.border}`, minWidth: 60, textAlign: 'right' }}>
+                          {formatTime(log.time)}
+                        </span>
+                        {/* Level */}
+                        <span style={{ fontSize: 8, fontWeight: 800, textTransform: 'uppercase', padding: '4px 5px', flexShrink: 0, color: isErr ? DT.red : isWarn ? DT.yellow : DT.textDim, borderRight: `1px solid ${DT.border}`, minWidth: 40, textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+                          {isActive && <span style={{ width: 4, height: 4, borderRadius: '50%', background: DT.accent, display: 'inline-block', animation: 'pulseGlow 1.5s infinite', flexShrink: 0 }} />}
+                          {log.type}
+                        </span>
+                        {/* Message */}
+                        <div style={{ flex: 1, padding: '3px 8px', fontSize: 12, lineHeight: 1.6, minWidth: 0, color: isErr ? DT.red : isWarn ? DT.yellow : DT.text }}>
+                          {renderConsoleLog(log)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ─── NETWORK PANEL ─── */}
+          {activeTab === 'network' && (
+            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+              {/* Request list */}
+              <div style={{ display: 'flex', flexDirection: 'column', width: selectedNetworkReq ? 260 : '100%', flexShrink: 0, overflow: 'hidden', borderRight: selectedNetworkReq ? `1px solid ${DT.border}` : 'none' }}>
+                {/* Toolbar */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', background: DT.surface, borderBottom: `1px solid ${DT.border}`, flexShrink: 0 }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <Search size={11} style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: DT.textDim }} />
+                    <input type="text" placeholder="Filter" value={networkFilter} onChange={e => setNetworkFilter(e.target.value)}
+                      style={{ width: '100%', height: 24, paddingLeft: 26, paddingRight: 8, background: DT.bg, border: `1px solid ${DT.border}`, borderRadius: 4, fontSize: 12, color: DT.text, outline: 'none', fontFamily: 'Inter,sans-serif' }} />
+                  </div>
+                  <div style={{ fontSize: 10, color: DT.textDim, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                    {activeNetIndex >= 0 ? activeNetIndex + 1 : 0} / {filteredNetwork.length}
+                  </div>
+                </div>
+
+                {/* Column headers */}
+                <div style={{ display: 'flex', alignItems: 'center', background: DT.surface, borderBottom: `1px solid ${DT.border}`, padding: '0 8px', height: 22, flexShrink: 0 }}>
+                  {['Method', 'Status', 'Path', 'Time'].map(h => (
+                    <span key={h} style={{ fontSize: 9, fontWeight: 700, color: DT.textDim, flex: h === 'Path' ? 1 : 'none', width: h === 'Method' ? 52 : h === 'Status' ? 46 : h === 'Time' ? 60 : 'auto', textAlign: h === 'Status' || h === 'Time' ? 'center' : 'left', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                      {h}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Request rows */}
+                <div ref={networkContainerRef} style={{ flex: 1, overflowY: 'auto', background: DT.bg }}>
+                  {filteredNetwork.length === 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: DT.textDim, gap: 8 }}>
+                      <Network size={20} style={{ opacity: 0.35 }} />
+                      <span style={{ fontSize: 12, fontFamily: 'monospace' }}>{networkFilter ? 'No matching requests.' : 'No network activity captured.'}</span>
                     </div>
                   ) : (
-                    visibleLogs.map((log, index) => {
-                      const isErr = log.type === 'error';
-                      const isWarn = log.type === 'warn';
+                    filteredNetwork.map((req, i) => {
+                      const isOk = req.status >= 200 && req.status < 300;
+                      const isNetErr = req.status === 0 || req.status >= 400;
+                      const isSel = selectedNetworkReq?._id === req._id;
+                      const isActive = i === activeNetIndex;
+                      const rowBg = isSel ? DT.bgActive : isActive ? 'rgba(137,180,250,0.06)' : (i % 2 === 0 ? DT.bg : DT.bgAlt);
+
                       return (
-                        <div
-                          key={log._id || index}
-                          className={`font-mono text-xs px-4 py-2 border-l-4 leading-relaxed flex items-start space-x-3 transition-colors hover:bg-slate-50/50 ${isErr
-                              ? 'bg-rose-50/30 border-l-rose-500 text-rose-700'
-                              : isWarn
-                                ? 'bg-amber-50/30 border-l-amber-500 text-amber-700'
-                                : 'border-l-transparent text-slate-800'
-                            }`}
-                        >
-                          <span className="text-slate-400 shrink-0 select-none text-[10px] mt-0.5">[{formatVideoTime(log.time)}]</span>
-                          <span className={`font-bold shrink-0 select-none text-[9px] uppercase px-1.5 py-0.5 rounded ${isErr ? 'bg-rose-100 text-rose-700' : isWarn ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-                            }`}>{log.type}</span>
-                          <div className="flex-1 min-w-0">{renderConsoleLog(log)}</div>
-                        </div>
+                        <button key={req._id || i} ref={isActive ? activeNetRef : null} onClick={() => setSelectedNetworkReq(req)}
+                          style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', padding: '0 8px', height: 22, background: rowBg, border: 'none', borderBottom: `1px solid ${DT.bgAlt}`, borderLeft: isActive || isSel ? `3px solid ${DT.accent}` : '3px solid transparent', cursor: 'pointer', outline: 'none', transition: 'background 0.35s ease', animation: isActive && !isSel ? 'hlFlash 1.5s ease-out forwards' : 'none', fontFamily: 'inherit' }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: methodColor(req.method), width: 52, flexShrink: 0, fontFamily: 'monospace' }}>{req.method}</span>
+                          <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, width: 46, flexShrink: 0, textAlign: 'center', color: isOk ? DT.green : isNetErr ? DT.red : DT.textSub }}>
+                            {req.status === 0 ? 'FAIL' : req.status}
+                          </span>
+                          <span style={{ fontSize: 10, color: DT.textSub, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'monospace' }} title={req.url}>
+                            {req.url.replace(/^https?:\/\/[^/]+/, '') || req.url}
+                          </span>
+                          <span style={{ fontSize: 9, color: DT.textDim, fontFamily: 'monospace', width: 60, textAlign: 'right', flexShrink: 0 }}>{formatTime(req.time)}</span>
+                        </button>
                       );
                     })
                   )}
                 </div>
               </div>
-            )}
 
-            {/* NETWORK INSPECTION PANEL */}
-            {activeTab === 'network' && (
-              <div className="flex-1 flex min-h-0 bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm relative">
-
-                {/* Left pane: Requests list */}
-                <div className={`flex-1 flex flex-col min-h-0 ${selectedNetworkReq ? 'hidden md:flex md:max-w-xs border-r border-slate-200' : ''}`}>
-                  <div className="bg-slate-50 px-4 py-2 border-b border-slate-200 flex items-center relative">
-                    <Search size={12} className="absolute left-7 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      placeholder="Filter API paths..."
-                      value={networkFilter}
-                      onChange={(e) => setNetworkFilter(e.target.value)}
-                      className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-4 py-1.5 text-xs text-slate-700 placeholder-slate-400 outline-none focus:border-indigo-400/50"
-                    />
+              {/* Detail panel */}
+              {selectedNetworkReq ? (
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: DT.bg }}>
+                  <div style={{ padding: '6px 12px', background: DT.surface, borderBottom: `1px solid ${DT.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, fontFamily: 'monospace', color: methodColor(selectedNetworkReq.method), flexShrink: 0 }}>{selectedNetworkReq.method}</span>
+                      <span style={{ fontSize: 10, color: DT.textSub, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selectedNetworkReq.url}>
+                        {selectedNetworkReq.url.replace(/^https?:\/\/[^/]+/, '') || selectedNetworkReq.url}
+                      </span>
+                    </div>
+                    <button onClick={() => setSelectedNetworkReq(null)} style={{ background: DT.tag, border: 'none', borderRadius: 4, fontSize: 10, color: DT.textSub, padding: '3px 8px', cursor: 'pointer', fontFamily: 'Inter,sans-serif', flexShrink: 0, marginLeft: 8 }}>✕</button>
                   </div>
 
-                  <div
-                    ref={networkContainerRef}
-                    className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-slate-100 bg-white"
-                  >
-                    {visibleNetwork.length === 0 ? (
-                      <div className="text-slate-400 text-xs font-mono text-center mt-12">
-                        {networkFilter ? 'No matching request logs.' : 'No network activity up to this timestamp.'}
+                  <div style={{ flex: 1, overflowY: 'auto', padding: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      {[
+                        { label: 'Status', value: selectedNetworkReq.status || 'Failed', isStatus: true },
+                        { label: 'Duration', value: selectedNetworkReq.duration ? `${selectedNetworkReq.duration}ms` : 'N/A' },
+                        { label: 'At', value: formatTime(selectedNetworkReq.time) },
+                      ].map(({ label, value, isStatus }) => (
+                        <div key={label} style={{ background: DT.surface, border: `1px solid ${DT.border}`, borderRadius: 6, padding: '8px 10px', textAlign: 'center' }}>
+                          <div style={{ fontSize: 9, color: DT.textDim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>{label}</div>
+                          <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'monospace', color: isStatus ? (selectedNetworkReq.status >= 200 && selectedNetworkReq.status < 300 ? DT.green : DT.red) : DT.text }}>{value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {selectedNetworkReq.requestHeaders && Object.keys(selectedNetworkReq.requestHeaders).length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: DT.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <FileCode size={10} style={{ color: DT.accent }} /> Request Headers
+                        </div>
+                        {renderJSONPayload(selectedNetworkReq.requestHeaders)}
                       </div>
-                    ) : (
-                      visibleNetwork.map((req, index) => {
-                        const isSuccess = req.status >= 200 && req.status < 300;
-                        const isErr = req.status === 0 || req.status >= 400;
-                        const isSelected = selectedNetworkReq && selectedNetworkReq._id === req._id;
-                        return (
-                          <button
-                            key={req._id || index}
-                            onClick={() => setSelectedNetworkReq(req)}
-                            className={`w-full text-left p-3.5 flex flex-col space-y-2 transition-all text-xs font-mono border-l-4 ${isSelected
-                                ? 'bg-indigo-50 border-indigo-500 text-indigo-900 font-semibold'
-                                : 'hover:bg-slate-50 border-transparent text-slate-700'
-                              }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center space-x-2">
-                                <span className={`font-extrabold ${req.method === 'POST' ? 'text-emerald-600' : 'text-sky-600'}`}>
-                                  {req.method}
-                                </span>
-                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isSuccess ? 'bg-emerald-50 text-emerald-700' : isErr ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'
-                                  }`}>
-                                  {req.status === 0 ? 'FAIL' : req.status}
-                                </span>
-                              </div>
-                              <span className="text-[9px] text-slate-400 font-semibold">[{formatVideoTime(req.time)}]</span>
-                            </div>
-                            <div className="truncate text-slate-500 text-[11px]" title={req.url}>
-                              {req.url.replace(/^https?:\/\/[^/]+/, '') || req.url}
-                            </div>
-                          </button>
-                        );
-                      })
                     )}
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: DT.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <FileCode size={10} style={{ color: DT.accent }} /> Request Body
+                      </div>
+                      {renderJSONPayload(selectedNetworkReq.requestBody)}
+                    </div>
+                    {selectedNetworkReq.responseHeaders && Object.keys(selectedNetworkReq.responseHeaders).length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: DT.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <Server size={10} style={{ color: DT.green }} /> Response Headers
+                        </div>
+                        {renderJSONPayload(selectedNetworkReq.responseHeaders)}
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: DT.textDim, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Server size={10} style={{ color: DT.green }} /> Response Body
+                      </div>
+                      {renderJSONPayload(selectedNetworkReq.responseBody)}
+                    </div>
                   </div>
                 </div>
-
-                {/* Right details inspection panel */}
-                {selectedNetworkReq ? (
-                  <div className="flex-1 flex flex-col min-h-0 bg-white animate-in fade-in slide-in-from-right-4 duration-200">
-                    {/* Drawer top details toolbar */}
-                    <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">
-                      <div className="flex items-center space-x-2">
-                        <span className={`text-xs font-bold font-mono ${selectedNetworkReq.method === 'POST' ? 'text-emerald-600' : 'text-sky-600'}`}>
-                          {selectedNetworkReq.method}
-                        </span>
-                        <span className="text-[11px] text-slate-700 font-mono truncate max-w-xs" title={selectedNetworkReq.url}>
-                          {selectedNetworkReq.url.replace(/^https?:\/\/[^/]+/, '') || selectedNetworkReq.url}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => setSelectedNetworkReq(null)}
-                        className="text-slate-605 hover:text-slate-800 px-2.5 py-1 rounded-xl bg-slate-200/50 hover:bg-slate-200 text-[10px] font-semibold border border-slate-200 transition-colors"
-                      >
-                        Close
-                      </button>
-                    </div>
-
-                    {/* Stats and Payloads */}
-                    <div className="flex-1 overflow-y-auto p-5 space-y-5 custom-scrollbar bg-white">
-
-                      {/* Meta information tags */}
-                      <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-center font-mono select-text">
-                        <div>
-                          <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1">Status</div>
-                          <div className={`text-xs font-bold ${selectedNetworkReq.status >= 200 && selectedNetworkReq.status < 300 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {selectedNetworkReq.status || 'Failed'}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1">Latency</div>
-                          <div className="text-xs font-bold text-slate-700">{selectedNetworkReq.duration ? `${selectedNetworkReq.duration}ms` : 'N/A'}</div>
-                        </div>
-                        <div>
-                          <div className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1">Offset</div>
-                          <div className="text-xs font-bold text-slate-700">{formatVideoTime(selectedNetworkReq.time)}</div>
-                        </div>
-                      </div>
-
-                      {/* Request Headers */}
-                      {selectedNetworkReq.requestHeaders && Object.keys(selectedNetworkReq.requestHeaders).length > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-1.5 text-[10px] text-slate-555 font-bold uppercase tracking-wider">
-                            <FileCode size={11} className="text-indigo-600" />
-                            <span>Request Headers</span>
-                          </div>
-                          <div>{renderJSONPayload(selectedNetworkReq.requestHeaders)}</div>
-                        </div>
-                      )}
-
-                      {/* Request Body Payload */}
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-1.5 text-[10px] text-slate-555 font-bold uppercase tracking-wider">
-                          <FileCode size={11} className="text-indigo-600" />
-                          <span>Request Payload Body</span>
-                        </div>
-                        <div>{renderJSONPayload(selectedNetworkReq.requestBody)}</div>
-                      </div>
-
-                      {/* Response Headers */}
-                      {selectedNetworkReq.responseHeaders && Object.keys(selectedNetworkReq.responseHeaders).length > 0 && (
-                        <div className="space-y-2">
-                          <div className="flex items-center space-x-1.5 text-[10px] text-slate-555 font-bold uppercase tracking-wider">
-                            <Server size={11} className="text-indigo-600" />
-                            <span>Response Headers</span>
-                          </div>
-                          <div>{renderJSONPayload(selectedNetworkReq.responseHeaders)}</div>
-                        </div>
-                      )}
-
-                      {/* Response Body Payload */}
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-1.5 text-[10px] text-slate-555 font-bold uppercase tracking-wider">
-                          <Server size={11} className="text-indigo-600" />
-                          <span>Response Payload Body</span>
-                        </div>
-                        <div>{renderJSONPayload(selectedNetworkReq.responseBody)}</div>
-                      </div>
-
-                    </div>
+              ) : (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: DT.textDim, background: DT.bgAlt }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Info size={20} style={{ opacity: 0.3, margin: '0 auto 8px' }} />
+                    <p style={{ fontSize: 12 }}>Click a request to inspect details</p>
                   </div>
-                ) : (
-                  <div className="hidden md:flex flex-1 items-center justify-center text-slate-400 text-xs font-mono p-6 text-center select-none bg-white">
-                    <div className="space-y-2">
-                      <Info size={20} className="mx-auto text-slate-400" />
-                      <p className="text-slate-500">Select any network API request to inspect headers and body payloads.</p>
-                    </div>
-                  </div>
-                )}
+                </div>
+              )}
+            </div>
+          )}
 
-              </div>
-            )}
-
-            {/* ACTIONS PANEL */}
-            {activeTab === 'actions' && (
-              <div
-                ref={actionsContainerRef}
-                className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar bg-white border border-slate-200 rounded-2xl shadow-inner"
-              >
-                {visibleActions.length === 0 ? (
-                  <div className="text-slate-400 text-xs font-mono text-center mt-12 select-none">
-                    No user clicks or keystrokes recorded up to this point.
-                  </div>
-                ) : (
-                  <div className="space-y-4 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
-                    {visibleActions.map((act, index) => (
-                      <div key={act._id || index} className="flex items-start space-x-4 relative pl-6">
-                        {/* Dot Bullet */}
-                        <div className="absolute left-[9px] top-[7px] w-2 h-2 rounded-full border border-indigo-500 bg-white z-10 shrink-0"></div>
-
-                        <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-xl flex-1 text-xs font-mono flex flex-col space-y-1.5 shadow-sm hover:border-indigo-150 transition-colors">
-                          <div className="flex justify-between items-center text-[9px]">
-                            <span className="font-bold text-indigo-600 uppercase tracking-wider">{act.type} interaction</span>
-                            <span className="text-slate-400">[{formatVideoTime(act.time)}]</span>
+          {/* ─── ACTIONS PANEL ─── */}
+          {activeTab === 'actions' && (
+            <div ref={actionsContainerRef} style={{ flex: 1, overflowY: 'auto', background: DT.bg }}>
+              {actions.length === 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: DT.textDim, gap: 8 }}>
+                  <MousePointer2 size={20} style={{ opacity: 0.35 }} />
+                  <span style={{ fontSize: 12, fontFamily: 'monospace' }}>No user interactions captured.</span>
+                </div>
+              ) : (
+                <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {actions.map((act, i) => {
+                    const isActive = i === activeActIndex;
+                    return (
+                      <div key={act._id || i} ref={isActive ? activeActRef : null}
+                        style={{ display: 'flex', alignItems: 'flex-start', gap: 10, transition: 'all 0.3s ease' }}>
+                        {/* Timeline dot */}
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 10, background: isActive ? DT.accent : DT.textDim, border: `2px solid ${isActive ? DT.accent : DT.border}`, boxShadow: isActive ? `0 0 0 3px rgba(137,180,250,0.15)` : 'none', transition: 'all 0.3s ease' }} />
+                        {/* Card — same darkness always, only border+shadow changes when active */}
+                        <div style={{ flex: 1, background: DT.surface, border: isActive ? `1px solid ${DT.accent}30` : `1px solid ${DT.border}`, borderRadius: 8, padding: '7px 11px', transition: 'all 0.3s ease', boxShadow: isActive ? `0 0 0 1px ${DT.accent}20, 0 2px 12px rgba(137,180,250,0.07)` : 'none', animation: isActive ? 'hlFlashAction 1.5s ease-out forwards' : 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {isActive && <span style={{ width: 4, height: 4, borderRadius: '50%', background: DT.accent, display: 'inline-block', animation: 'pulseGlow 1.5s infinite', flexShrink: 0 }} />}
+                              <span style={{ fontSize: 9, fontWeight: 800, color: isActive ? DT.accent : DT.textDim, textTransform: 'uppercase', letterSpacing: '0.08em', fontFamily: 'monospace' }}>
+                                {act.type}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: 9, color: DT.textDim, fontFamily: 'monospace' }}>{formatTime(act.time)}</span>
                           </div>
-                          <div className="text-slate-700">
-                            Target Element: <code className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100 text-[10px]">{act.element}</code>
+                          <div style={{ fontSize: 11, color: DT.textSub }}>
+                            <span style={{ color: DT.textDim }}>Target: </span>
+                            <code style={{ fontSize: 10, color: DT.accent, background: 'rgba(137,180,250,0.08)', padding: '1px 6px', borderRadius: 4, fontFamily: 'monospace' }}>
+                              {act.element}
+                            </code>
                           </div>
                           {act.value && act.value !== '***' && (
-                            <div className="text-slate-550 text-[10px] flex items-center mt-1">
-                              <CornerDownRight size={10} className="text-slate-400 mr-1.5" />
-                              <span>Entered Text: <span className="text-slate-600 italic">"{act.value}"</span></span>
+                            <div style={{ fontSize: 10, color: DT.textDim, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <CornerDownRight size={8} />
+                              Input: <span style={{ color: DT.cyan, fontStyle: 'italic' }}>"{act.value}"</span>
                             </div>
                           )}
-                          <div className="text-[9px] text-slate-400 mt-1 italic">
-                            Origin path: {act.page || '/'}
-                          </div>
+                          <div style={{ fontSize: 9, color: DT.textDim, marginTop: 3, fontStyle: 'italic', opacity: 0.7 }}>{act.page || '/'}</div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-          </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
-
       </div>
-
     </div>
   );
 };

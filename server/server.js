@@ -41,7 +41,7 @@ app.use('/api/upload', uploadRoutes);
 
 // ── Health check route ────────────────────────────────────────────
 app.get('/', (req, res) => {
-  res.json({ message: 'Jam.dev Clone API is running ✓', status: 'ok' });
+  res.json({ message: 'DebugSnap API is running ✓', status: 'ok' });
 });
 
 // ── Global Error Handler ───────────────────────────────────────────

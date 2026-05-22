@@ -19,7 +19,7 @@ export const uploadVideo = asyncHandler(async (req, res) => {
   try {
     const result = await cloudinary.uploader.upload(req.file.path, {
       resource_type: 'video',
-      folder: 'jam_dev_clone/videos',
+      folder: 'debugsnap/videos',
     });
 
     // Remove the temporary file created by multer

@@ -2,135 +2,54 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { 
-  BugPlay, 
-  LogOut, 
-  Video, 
-  Clock, 
-  Calendar, 
-  Trash2, 
-  Search, 
-  Key, 
-  Copy, 
-  Check, 
-  Laptop, 
-  Activity, 
-  FileText, 
-  X,
-  Play,
-  Filter
+import {
+  LogOut, Video, Clock, Calendar, Trash2, Search,
+  Key, Copy, Check, Laptop, Activity, FileText, X, Play, Filter, Wifi, WifiOff, Zap
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-/**
- * Dashboard Component
- * Renders the main user workspace showing all recorded sessions, live recording states,
- * and handles connecting the Chrome extension using an API authentication token.
- */
 const Dashboard = () => {
-  // Authentication context for current logged-in user
   const { user, logout } = useAuth();
-  
-  // State variables for sessions and UI loaders
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [wsConnected, setWsConnected] = useState(false);
-  
-  // Search text query and status filters ('all', 'recording', 'completed')
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  // Control state for the API Token popup modal
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
 
-  // 1. Fetch the user's recorded sessions from the server when page mounts
   useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const { data } = await axios.get('http://localhost:5000/api/sessions/my');
-        setSessions(data);
-      } catch (error) {
-        console.error('Failed to fetch sessions', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchSessions();
+    axios.get('http://localhost:5000/api/sessions/my')
+      .then(({ data }) => setSessions(data))
+      .catch(e => console.error('Failed to fetch sessions', e))
+      .finally(() => setLoading(false));
   }, []);
 
-  // 2. Setup Socket.io client to listen for real-time creation, completion, or deletion of sessions
   useEffect(() => {
-    if (!user || !user.token) return;
-
-    // Connect to the backend socket room authenticated with the JWT token
+    if (!user?.token) return;
     const socket = io('http://localhost:5000', {
       query: { token: user.token },
       reconnectionAttempts: 5,
-      reconnectionDelay: 3000
+      reconnectionDelay: 3000,
     });
-
-    socket.on('connect', () => {
-      console.log('[Socket.io] Connected to live session updates');
-      setWsConnected(true);
-    });
-
-    socket.on('disconnect', () => {
-      console.log('[Socket.io] Disconnected');
-      setWsConnected(false);
-    });
-
-    socket.on('connect_error', (err) => {
-      console.error('[Socket.io] Connection error:', err.message);
-      setWsConnected(false);
-    });
-
-    // When a new session starts recording in the extension
-    socket.on('SESSION_CREATED', (payload) => {
-      setSessions((prev) => {
-        // Prevent duplicate logs in state
-        if (prev.some((s) => s._id === payload._id)) return prev;
-        return [payload, ...prev];
-      });
-    });
-
-    // When a session is completed and uploaded
-    socket.on('SESSION_COMPLETED', (payload) => {
-      setSessions((prev) =>
-        prev.map((s) => (s._id === payload._id ? { ...s, ...payload } : s))
-      );
-    });
-
-    // When a session is deleted from another window
-    socket.on('SESSION_DELETED', (payload) => {
-      setSessions((prev) => prev.filter((s) => s._id !== payload.sessionId));
-    });
-
-    // Cleanup socket on unmount
-    return () => {
-      socket.disconnect();
-    };
+    socket.on('connect', () => setWsConnected(true));
+    socket.on('disconnect', () => setWsConnected(false));
+    socket.on('connect_error', () => setWsConnected(false));
+    socket.on('SESSION_CREATED',   p => setSessions(prev => prev.some(s => s._id === p._id) ? prev : [p, ...prev]));
+    socket.on('SESSION_COMPLETED', p => setSessions(prev => prev.map(s => s._id === p._id ? { ...s, ...p } : s)));
+    socket.on('SESSION_DELETED',   p => setSessions(prev => prev.filter(s => s._id !== p.sessionId)));
+    return () => socket.disconnect();
   }, [user]);
 
-  // 3. Request delete endpoint and update state on confirmation
   const handleDelete = async (e, sessionId) => {
-    e.preventDefault();
-    e.stopPropagation(); // Avoid triggering Link component routing
-
-    if (!window.confirm('Are you sure you want to permanently delete this session and all its logs?')) {
-      return;
-    }
-
+    e.preventDefault(); e.stopPropagation();
+    if (!window.confirm('Permanently delete this session and all its logs?')) return;
     try {
       await axios.delete(`http://localhost:5000/api/sessions/${sessionId}`);
-      setSessions(sessions.filter((s) => s._id !== sessionId));
-    } catch (error) {
-      console.error('Failed to delete session', error);
-      alert('Failed to delete session. Please try again.');
-    }
+      setSessions(s => s.filter(x => x._id !== sessionId));
+    } catch { alert('Failed to delete session. Please try again.'); }
   };
 
-  // 4. Clipboard helper to copy user JWT token
   const handleCopyToken = () => {
     if (!user?.token) return;
     navigator.clipboard.writeText(user.token).then(() => {
@@ -139,262 +58,248 @@ const Dashboard = () => {
     });
   };
 
-  // Helper: Format elapsed duration (seconds -> MM:SS)
-  const formatDuration = (seconds) => {
-    if (!seconds) return '00:00';
-    const m = Math.floor(seconds / 60).toString().padStart(2, '0');
-    const s = Math.floor(seconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
+  const formatDuration = (s) => {
+    if (!s) return '—';
+    return `${Math.floor(s/60).toString().padStart(2,'0')}:${Math.floor(s%60).toString().padStart(2,'0')}`;
   };
 
-  // Filter list matching search query & tab selection
-  const filteredSessions = sessions.filter((session) => {
-    const matchesSearch = session.title.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || session.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredSessions = sessions.filter(s =>
+    s.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+    (statusFilter === 'all' || s.status === statusFilter)
+  );
 
-  // Derived metrics counts
-  const totalSessions = sessions.length;
-  const activeSessions = sessions.filter(s => s.status === 'recording').length;
+  const totalSessions     = sessions.length;
+  const activeSessions    = sessions.filter(s => s.status === 'recording').length;
   const completedSessions = sessions.filter(s => s.status === 'completed').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 bg-grid-glow text-slate-800 p-6 md:p-10 font-sans relative">
-      
-      {/* Light Glassmorphic Header Navigation Bar */}
-      <nav className="glass-panel sticky top-4 z-40 max-w-6xl mx-auto flex items-center justify-between px-6 py-4 rounded-2xl shadow-md mb-12">
-        <div className="flex items-center space-x-3 text-indigo-600">
-          <BugPlay size={28} className="stroke-[2.5]" />
-          <h1 className="text-lg font-extrabold text-slate-900 tracking-tight">
-            Jam<span className="text-indigo-600">.dev</span> Debugger
-          </h1>
+    <div style={{ minHeight: '100vh', background: '#0f0f1a', fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", WebkitFontSmoothing: 'antialiased', color: '#cdd6f4' }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(137,180,250,0.15); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(137,180,250,0.3); }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+        @keyframes recPulse {
+          0%,100% { box-shadow: 0 0 0 0 rgba(243,139,168,0.5); }
+          50%      { box-shadow: 0 0 0 6px rgba(243,139,168,0); }
+        }
+        @keyframes shimmer {
+          0%   { background-position: -400px 0; }
+          100% { background-position: 400px 0; }
+        }
+        .dash-card-link { text-decoration: none; }
+        .dash-card-link:hover .session-card { border-color: rgba(137,180,250,0.25) !important; box-shadow: 0 0 0 1px rgba(137,180,250,0.1), 0 8px 32px -8px rgba(0,0,0,0.5) !important; }
+        .dash-card-link:hover .session-thumb-icon { transform: scale(1.08); color: #89b4fa !important; }
+        .dash-card-link:hover .play-overlay { opacity: 1 !important; }
+        .stat-card:hover { border-color: rgba(137,180,250,0.2) !important; }
+        .filter-btn:hover { color: #cdd6f4 !important; }
+        .delete-btn:hover { background: rgba(243,139,168,0.12) !important; color: #f38ba8 !important; }
+      `}</style>
+
+      {/* ════ NAVBAR ════ */}
+      <nav style={{ position: 'sticky', top: 0, zIndex: 40, background: '#14141f', borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '0 24px', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        {/* Brand */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,rgba(99,102,241,0.25),rgba(139,92,246,0.25))', border: '1px solid rgba(99,102,241,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#89b4fa' }}>
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
+              <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 800, color: '#cdd6f4', letterSpacing: '-0.3px' }}>
+            Debug<span style={{ background: 'linear-gradient(135deg,#89b4fa,#cba6f7)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Snap</span>
+          </span>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <button 
-            onClick={() => setShowTokenModal(true)}
-            className="hidden sm:flex items-center space-x-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-100 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors"
-          >
-            <Key size={13} />
-            <span>Extension Token</span>
+        {/* Right controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button onClick={() => setShowTokenModal(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, background: 'rgba(137,180,250,0.08)', border: '1px solid rgba(137,180,250,0.15)', color: '#89b4fa', fontSize: 12, fontWeight: 600, cursor: 'pointer', outline: 'none', fontFamily: 'inherit', transition: 'all 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(137,180,250,0.14)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(137,180,250,0.08)'}>
+            <Key size={12} /><span>Extension Token</span>
           </button>
-          
-          <div className="h-5 w-px bg-slate-200 hidden sm:block"></div>
-          
-          <span className="text-xs text-slate-500 font-medium">
-            Hi, <span className="text-slate-800 font-bold">{user?.username}</span>
+
+          <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.07)' }} />
+
+          <span style={{ fontSize: 12, color: '#6c7086', fontWeight: 500 }}>
+            Hi, <span style={{ color: '#a6adc8', fontWeight: 700 }}>{user?.username}</span>
           </span>
-          
-          <button
-            onClick={logout}
-            className="flex items-center space-x-2 text-rose-600 hover:text-rose-700 transition-colors text-xs font-semibold py-1.5 px-3 rounded-lg hover:bg-rose-50"
-          >
-            <LogOut size={13} />
-            <span>Logout</span>
+
+          <button onClick={logout} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 8, background: 'transparent', border: '1px solid rgba(243,139,168,0.15)', color: '#f38ba8', fontSize: 12, fontWeight: 600, cursor: 'pointer', outline: 'none', fontFamily: 'inherit', transition: 'all 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(243,139,168,0.08)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <LogOut size={12} /><span>Logout</span>
           </button>
         </div>
       </nav>
 
-      {/* Main Container */}
-      <main className="max-w-6xl mx-auto relative z-10">
-        
-        {/* Statistics Grid */}
-        <section className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
-          <div className="glass-panel p-5 rounded-2xl flex items-center justify-between shadow-sm">
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Total Bug Reports</p>
-              <h3 className="text-2xl font-extrabold text-slate-800 mt-1">{totalSessions}</h3>
-            </div>
-            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
-              <FileText size={18} />
-            </div>
-          </div>
-          
-          <div className="glass-panel p-5 rounded-2xl flex items-center justify-between shadow-sm">
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Live Streams</p>
-              <div className="flex items-center mt-1 space-x-2">
-                <h3 className="text-2xl font-extrabold text-slate-800">{activeSessions}</h3>
-                {activeSessions > 0 && <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping"></span>}
+      {/* ════ PAGE CONTENT ════ */}
+      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '32px 24px' }}>
+
+        {/* ── Stats ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
+          {[
+            { label: 'Total Reports',  value: totalSessions,     icon: FileText,  color: '#89b4fa', glow: 'rgba(137,180,250,0.12)' },
+            { label: 'Live Streams',   value: activeSessions,    icon: Activity,  color: '#f38ba8', glow: 'rgba(243,139,168,0.12)' },
+            { label: 'Completed Runs', value: completedSessions, icon: Video,     color: '#a6e3a1', glow: 'rgba(166,227,161,0.12)' },
+          ].map(({ label, value, icon: Icon, color, glow }) => (
+            <div key={label} className="stat-card" style={{ background: '#14141f', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', transition: 'border-color 0.2s' }}>
+              <div>
+                <p style={{ fontSize: 10, color: '#6c7086', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 6px' }}>{label}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <h3 style={{ fontSize: 28, fontWeight: 800, color: '#cdd6f4', margin: 0, lineHeight: 1 }}>{value}</h3>
+                  {label === 'Live Streams' && value > 0 && (
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f38ba8', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
+                  )}
+                </div>
+              </div>
+              <div style={{ width: 42, height: 42, borderRadius: 12, background: glow, border: `1px solid ${color}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', color }}>
+                <Icon size={18} />
               </div>
             </div>
-            <div className="p-3 bg-rose-50 text-rose-600 rounded-xl border border-rose-100">
-              <Activity size={18} />
-            </div>
-          </div>
-
-          <div className="glass-panel p-5 rounded-2xl flex items-center justify-between shadow-sm">
-            <div>
-              <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Completed Runs</p>
-              <h3 className="text-2xl font-extrabold text-slate-800 mt-1">{completedSessions}</h3>
-            </div>
-            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
-              <Video size={18} />
-            </div>
-          </div>
-        </section>
-
-        {/* Searching & Filters Section */}
-        <section className="glass-panel p-4 rounded-2xl shadow-sm mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-            <input 
-              type="text" 
-              placeholder="Search by report title..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl pl-10 pr-4 py-2 text-sm focus:outline-none focus:border-indigo-400 transition-colors text-slate-800 placeholder-slate-400"
-            />
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-1.5 text-xs text-slate-500 border border-slate-200 px-3 py-2 rounded-xl bg-white">
-              <Filter size={11} />
-              <span>Filter:</span>
-            </div>
-            <div className="flex bg-slate-100 p-0.5 border border-slate-200 rounded-xl">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'recording', label: 'Live' },
-                { id: 'completed', label: 'Completed' }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    statusFilter === tab.id 
-                      ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/50' 
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            
-            {/* Live Socket.io status badge */}
-            <div className="flex items-center space-x-2 bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-500 select-none">
-              <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
-              <span className="font-semibold hidden sm:inline">{wsConnected ? 'Live Sync' : 'Offline'}</span>
-            </div>
-          </div>
-        </section>
-
-        {/* Small Screen connection token button */}
-        <div className="mb-6 block sm:hidden">
-          <button 
-            onClick={() => setShowTokenModal(true)}
-            className="w-full flex items-center justify-center space-x-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 py-2.5 rounded-xl text-xs font-bold transition-colors"
-          >
-            <Key size={13} />
-            <span>Connection Token</span>
-          </button>
+          ))}
         </div>
 
-        {/* Reports Grid */}
+        {/* ── Toolbar ── */}
+        <div style={{ background: '#14141f', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 14, padding: '12px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          {/* Search */}
+          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+            <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6c7086' }} />
+            <input type="text" placeholder="Search by report title…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              style={{ width: '100%', height: 34, paddingLeft: 30, paddingRight: 12, background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, fontSize: 12, color: '#cdd6f4', outline: 'none', fontFamily: 'inherit' }}
+              onFocus={e => e.target.style.borderColor = 'rgba(137,180,250,0.4)'}
+              onBlur={e => e.target.style.borderColor = 'rgba(255,255,255,0.08)'} />
+          </div>
+
+          {/* Filter tabs */}
+          <div style={{ display: 'flex', background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 8, padding: 3, gap: 2 }}>
+            {[{ id: 'all', label: 'All' }, { id: 'recording', label: 'Live' }, { id: 'completed', label: 'Done' }].map(tab => (
+              <button key={tab.id} className="filter-btn" onClick={() => setStatusFilter(tab.id)}
+                style={{ padding: '5px 12px', fontSize: 11, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer', outline: 'none', fontFamily: 'inherit', transition: 'all 0.15s', background: statusFilter === tab.id ? '#252535' : 'transparent', color: statusFilter === tab.id ? '#89b4fa' : '#6c7086', boxShadow: statusFilter === tab.id ? '0 1px 3px rgba(0,0,0,0.3)' : 'none' }}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* WS status */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', background: '#1e1e2e', border: `1px solid ${wsConnected ? 'rgba(166,227,161,0.2)' : 'rgba(243,139,168,0.15)'}`, borderRadius: 8, fontSize: 11, fontWeight: 600, color: wsConnected ? '#a6e3a1' : '#f38ba8' }}>
+            {wsConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+            <span>{wsConnected ? 'Live Sync' : 'Offline'}</span>
+          </div>
+        </div>
+
+        {/* ── Session Grid ── */}
         {loading ? (
-          /* Skeletons load effect */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="glass-panel rounded-2xl overflow-hidden border border-slate-200 flex flex-col h-[260px] shadow-sm">
-                <div className="h-36 animate-shimmer"></div>
-                <div className="p-4 flex-1 space-y-3">
-                  <div className="h-4 bg-slate-200 rounded w-3/4 animate-shimmer"></div>
-                  <div className="flex justify-between items-center pt-3">
-                    <div className="h-3 bg-slate-200 rounded w-1/3 animate-shimmer"></div>
-                    <div className="h-3 bg-slate-200 rounded w-1/4 animate-shimmer"></div>
-                  </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 16 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ background: '#14141f', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden', height: 240 }}>
+                <div style={{ height: 130, background: `linear-gradient(90deg, #1e1e2e 25%, #252535 50%, #1e1e2e 75%)`, backgroundSize: '800px 100%', animation: 'shimmer 1.4s infinite' }} />
+                <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ height: 12, borderRadius: 6, background: `linear-gradient(90deg, #1e1e2e 25%, #252535 50%, #1e1e2e 75%)`, backgroundSize: '800px 100%', animation: 'shimmer 1.4s infinite', width: '70%' }} />
+                  <div style={{ height: 10, borderRadius: 6, background: `linear-gradient(90deg, #1e1e2e 25%, #252535 50%, #1e1e2e 75%)`, backgroundSize: '800px 100%', animation: 'shimmer 1.4s infinite', width: '45%' }} />
                 </div>
               </div>
             ))}
           </div>
         ) : filteredSessions.length === 0 ? (
-          <div className="glass-panel border border-slate-200 rounded-2xl p-12 text-center shadow-sm max-w-md mx-auto mt-8 bg-white">
-            <div className="w-14 h-14 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm">
-              <Video size={24} />
+          <div style={{ textAlign: 'center', padding: '64px 24px', background: '#14141f', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, maxWidth: 420, margin: '0 auto' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(137,180,250,0.08)', border: '1px solid rgba(137,180,250,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#89b4fa', margin: '0 auto 16px' }}>
+              <Video size={22} />
             </div>
-            <h3 className="text-base font-bold text-slate-800 mb-1.5">No reports found</h3>
-            <p className="text-slate-500 text-xs max-w-xs mx-auto mb-5 leading-relaxed">
-              Start recording screen, console events, and clicks using the Chrome extension to see bug logs populate here.
+            <h3 style={{ fontSize: 15, fontWeight: 700, color: '#cdd6f4', margin: '0 0 8px' }}>No reports found</h3>
+            <p style={{ fontSize: 12, color: '#6c7086', lineHeight: 1.7, margin: '0 0 20px', maxWidth: 300, marginLeft: 'auto', marginRight: 'auto' }}>
+              Start recording a session using the Chrome extension to see bug reports appear here.
             </p>
-            <button 
-              onClick={() => setShowTokenModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm"
-            >
-              How to Connect Extension
+            <button onClick={() => setShowTokenModal(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              <Zap size={12} /> Connect Extension
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSessions.map((session) => (
-              <Link
-                to={`/session/${session.publicId}`}
-                key={session._id}
-                className="group glass-panel glass-panel-hover rounded-2xl overflow-hidden flex flex-col h-[260px] shadow-sm bg-white"
-              >
-                {/* Visual Video Status Frame */}
-                <div className="h-36 bg-slate-100 relative overflow-hidden flex items-center justify-center border-b border-slate-200/60 select-none">
-                  {session.status === 'recording' ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-rose-500/5">
-                      <div className="w-4.5 h-4.5 bg-rose-600 rounded-full animate-recording flex items-center justify-center mb-2">
-                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 16 }}>
+            {filteredSessions.map(session => (
+              <Link to={`/session/${session.publicId}`} key={session._id} className="dash-card-link">
+                <div className="session-card" style={{ background: '#14141f', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 16, overflow: 'hidden', height: 250, display: 'flex', flexDirection: 'column', cursor: 'pointer', transition: 'border-color 0.2s, box-shadow 0.2s', boxShadow: '0 4px 20px -8px rgba(0,0,0,0.5)' }}>
+
+                  {/* Thumbnail */}
+                  <div style={{ height: 130, background: '#1e1e2e', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+                    {session.status === 'recording' ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#f38ba8', animation: 'recPulse 1.5s infinite' }} />
+                        <span style={{ fontSize: 9, fontWeight: 800, color: '#f38ba8', textTransform: 'uppercase', letterSpacing: '0.1em', animation: 'pulse 1.5s infinite' }}>Live Recording</span>
                       </div>
-                      <span className="text-[10px] font-extrabold text-rose-600 uppercase tracking-widest animate-pulse">Live Recording</span>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="absolute inset-0 bg-radial-gradient from-indigo-500/5 to-transparent"></div>
-                      <BugPlay size={32} className="text-slate-300 group-hover:scale-105 group-hover:text-indigo-200 transition-all duration-300" />
-                      <div className="absolute inset-0 bg-slate-900/10 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-300 backdrop-blur-[1px]">
-                        <div className="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow shadow-indigo-200 transform translate-y-1.5 group-hover:translate-y-0 transition-transform duration-300">
-                          <Play size={14} className="fill-white ml-0.5" />
+                    ) : (
+                      <>
+                        {/* Grid bg pattern */}
+                        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(137,180,250,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(137,180,250,0.04) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+                        <svg className="session-thumb-icon" style={{ color: '#313149', transition: 'all 0.25s', position: 'relative', zIndex: 1, width: 28, height: 28 }} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
+                          <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
+                          <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
+                        </svg>
+                        {/* Play overlay */}
+                        <div className="play-overlay" style={{ position: 'absolute', inset: 0, background: 'rgba(15,15,26,0.65)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s' }}>
+                          <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(99,102,241,0.4)' }}>
+                            <Play size={15} style={{ fill: 'white', color: 'white', marginLeft: 2 }} />
+                          </div>
                         </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Card Title & Meta details */}
-                <div className="p-4 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-xs font-bold text-slate-850 group-hover:text-indigo-600 transition-colors truncate flex-1 mr-2">
-                        {session.title}
-                      </h3>
-                      <button
-                        onClick={(e) => handleDelete(e, session._id)}
-                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1.5 rounded-lg transition-colors shrink-0"
-                        title="Delete recording"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-
-                    {/* Metadata tags */}
-                    {session.browserInfo && (
-                      <div className="flex flex-wrap gap-1.5 mb-2">
-                        <span className="flex items-center space-x-1 text-[10px] bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded border border-slate-200/50">
-                          <Laptop size={9} className="text-slate-400" />
-                          <span>{session.browserInfo.os || 'OS'}</span>
-                        </span>
-                        <span className="text-[10px] bg-slate-100 text-slate-600 font-medium px-2 py-0.5 rounded border border-slate-200/50">
-                          {session.browserInfo.browser || 'Browser'}
-                        </span>
-                      </div>
+                      </>
                     )}
                   </div>
 
-                  <div className="flex justify-between items-center pt-2.5 border-t border-slate-100 text-[10px] text-slate-500">
-                    <div className="flex items-center space-x-1">
-                      <Calendar size={11} className="text-slate-400" />
-                      <span>{new Date(session.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}</span>
+                  {/* Card body */}
+                  <div style={{ padding: '12px 14px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: 8 }}>
+                        <h3 style={{ fontSize: 12, fontWeight: 700, color: '#a6adc8', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                          {session.title}
+                        </h3>
+                        <button className="delete-btn" onClick={e => handleDelete(e, session._id)}
+                          style={{ color: '#6c7086', background: 'transparent', border: 'none', padding: '3px 5px', borderRadius: 6, cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s' }}
+                          title="Delete recording">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+
+                      {session.browserInfo && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 600, color: '#6c7086', background: '#252535', border: '1px solid rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 99 }}>
+                            <Laptop size={8} style={{ color: '#89b4fa' }} />{session.browserInfo.os || 'OS'}
+                          </span>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: '#6c7086', background: '#252535', border: '1px solid rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 99 }}>
+                            {session.browserInfo.browser || 'Browser'}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex items-center space-x-1 font-mono font-medium">
-                      <Clock size={11} className="text-slate-400" />
-                      <span>{session.status === 'recording' ? 'Recording' : formatDuration(session.duration)}</span>
+
+                    {/* Footer */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: 10, color: '#6c7086' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <Calendar size={9} style={{ color: '#6c7086' }} />
+                        {new Date(session.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' })}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'monospace', fontWeight: 600 }}>
+                        {session.status === 'recording' ? (
+                          <span style={{ color: '#f38ba8', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#f38ba8', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
+                            Recording
+                          </span>
+                        ) : (
+                          <>
+                            <Clock size={9} />
+                            {formatDuration(session.duration)}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
+
                 </div>
               </Link>
             ))}
@@ -402,67 +307,63 @@ const Dashboard = () => {
         )}
       </main>
 
-      {/* Extension Setup Connection Modal Popup */}
+      {/* ════ TOKEN MODAL ════ */}
       {showTokenModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-          <div className="glass-panel w-full max-w-md rounded-2xl shadow-xl overflow-hidden border border-slate-200 bg-white animate-in fade-in zoom-in-95 duration-200">
-            
-            {/* Header bar */}
-            <div className="flex justify-between items-center px-5 py-4 border-b border-slate-200 bg-slate-50">
-              <div className="flex items-center space-x-2 text-indigo-600">
-                <Key size={15} />
-                <h3 className="font-bold text-slate-900 text-sm">Chrome Extension Setup</h3>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(7,8,12,0.8)', backdropFilter: 'blur(12px)' }}
+          onClick={e => e.target === e.currentTarget && setShowTokenModal(false)}>
+          <div style={{ background: '#14141f', border: '1px solid rgba(137,180,250,0.2)', borderRadius: 20, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 32px 64px -12px rgba(0,0,0,0.7), 0 0 40px -10px rgba(99,102,241,0.15)', position: 'relative' }}>
+            {/* Top accent line */}
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(137,180,250,0.5), rgba(203,166,247,0.5), transparent)' }} />
+
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#89b4fa' }}>
+                <Key size={14} />
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#cdd6f4', margin: 0 }}>Chrome Extension Setup</h3>
               </div>
-              <button 
-                onClick={() => setShowTokenModal(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-              >
-                <X size={15} />
+              <button onClick={() => setShowTokenModal(false)} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 6, color: '#6c7086', cursor: 'pointer', padding: '4px 7px', display: 'flex', alignItems: 'center', transition: 'all 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#cdd6f4'}
+                onMouseLeave={e => e.currentTarget.style.color = '#6c7086'}>
+                <X size={13} />
               </button>
             </div>
-            
-            {/* Token Content */}
-            <div className="p-6 space-y-4.5">
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Connect the browser extension by pasting your authorization token. This maps all your bugs directly to your profile workspace.
+
+            {/* Content */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <p style={{ fontSize: 12, color: '#6c7086', lineHeight: 1.7, margin: 0 }}>
+                Connect the browser extension by pasting your authorization token. This maps all your bug reports directly to your profile.
               </p>
-              
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Your Private Token</label>
-                <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl p-1.5">
-                  <input 
-                    type="text" 
-                    readOnly 
-                    value={user?.token || ''}
-                    className="flex-1 bg-transparent px-2.5 text-xs font-mono text-slate-800 focus:outline-none select-all"
-                  />
-                  <button
-                    onClick={handleCopyToken}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg transition-colors shadow-sm"
-                    title="Copy token"
-                  >
-                    {tokenCopied ? <Check size={13} /> : <Copy size={13} />}
+
+              <div>
+                <label style={{ fontSize: 9, fontWeight: 700, color: '#4b5060', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>
+                  Your Private Token
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, padding: '4px 4px 4px 12px', gap: 8 }}>
+                  <input type="text" readOnly value={user?.token || ''} style={{ flex: 1, background: 'transparent', border: 'none', fontSize: 11, fontFamily: "'JetBrains Mono','Fira Code',monospace", color: '#89b4fa', outline: 'none' }} />
+                  <button onClick={handleCopyToken} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, background: tokenCopied ? 'rgba(166,227,161,0.12)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: 'none', color: tokenCopied ? '#a6e3a1' : 'white', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s', flexShrink: 0 }}>
+                    {tokenCopied ? <><Check size={11} /> Copied!</> : <><Copy size={11} /> Copy</>}
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-2 pt-1 border-t border-slate-100">
-                <h4 className="text-xs font-bold text-slate-800">Connection instructions:</h4>
-                <ol className="text-xs text-slate-500 space-y-1.5 list-decimal list-inside leading-relaxed">
+              <div style={{ background: '#1e1e2e', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: '14px 16px' }}>
+                <h4 style={{ fontSize: 11, fontWeight: 700, color: '#a6adc8', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Zap size={11} style={{ color: '#89b4fa' }} /> Connection steps
+                </h4>
+                <ol style={{ fontSize: 11, color: '#6c7086', paddingLeft: 18, margin: 0, lineHeight: 1.9 }}>
                   <li>Copy your token using the button above.</li>
-                  <li>Click the **Jam.dev Extension** icon in your browser toolbar.</li>
-                  <li>Paste the token into the text input and click **Save**.</li>
-                  <li>Open any web tab and click **🎬 Start Recording**!</li>
+                  <li>Click the <strong style={{ color: '#a6adc8' }}>DebugSnap Extension</strong> icon in your browser toolbar.</li>
+                  <li>The extension auto-reads your token from the dashboard.</li>
+                  <li>Navigate to any page and click <strong style={{ color: '#a6adc8' }}>Start Recording</strong>!</li>
                 </ol>
               </div>
             </div>
 
-            {/* Modal footer control */}
-            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex justify-end">
-              <button
-                onClick={() => setShowTokenModal(false)}
-                className="bg-slate-250 hover:bg-slate-300 text-slate-700 border border-slate-200 text-xs font-bold px-4 py-2 rounded-xl transition-all"
-              >
+            {/* Footer */}
+            <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowTokenModal(false)} style={{ padding: '8px 16px', borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#a6adc8', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.09)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}>
                 Close
               </button>
             </div>

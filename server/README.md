@@ -1,4 +1,4 @@
-# Jam.dev Clone - Backend Server
+# DebugSnap - Backend Server
 
 Welcome to the backend server! This is built using **Node.js** and **Express.js**. If you are a beginner, this guide will explain exactly what is happening here.
 

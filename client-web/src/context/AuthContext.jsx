@@ -10,7 +10,7 @@ export const AuthProvider = ({ children }) => {
 
 
   useEffect(() => {
-    const userInfo = localStorage.getItem('jam_user');
+    const userInfo = localStorage.getItem('debugsnap_user');
     if (userInfo) {
       setUser(JSON.parse(userInfo));
       //Always send token in Authorization header for protected routes
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await axios.post('http://localhost:5000/api/auth/login', { email, password });
       setUser(data);
-      localStorage.setItem('jam_user', JSON.stringify(data));
+      localStorage.setItem('debugsnap_user', JSON.stringify(data));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       return data;
     } catch (error) {
@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await axios.post('http://localhost:5000/api/auth/register', { username, email, password });
       setUser(data);
-      localStorage.setItem('jam_user', JSON.stringify(data));
+      localStorage.setItem('debugsnap_user', JSON.stringify(data));
       axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
       return data;
     } catch (error) {
@@ -45,7 +45,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('jam_user');
+    localStorage.removeItem('debugsnap_user');
     delete axios.defaults.headers.common['Authorization'];
   };
 

@@ -8,20 +8,6 @@ import {
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 
-/* ─────────────────────────────────────────
-   DESIGN TOKENS  (matches Intro.jsx)
-   bg:      #09090b   zinc-950
-   surface: #111113
-   border:  rgba(255,255,255,0.07)
-   cyan:    #22d3ee
-   amber:   #fbbf24
-   green:   #4ade80
-   rose:    #f87171
-   text:    #f4f4f5
-   sub:     #a1a1aa
-   muted:   #52525b
-───────────────────────────────────────── */
-
 const DASH_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600&display=swap');
   *, *::before, *::after { box-sizing: border-box; }
@@ -72,14 +58,14 @@ const DASH_STYLES = `
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
-  const [sessions, setSessions]         = useState([]);
-  const [loading, setLoading]           = useState(true);
-  const [wsConnected, setWsConnected]   = useState(false);
-  const [searchQuery, setSearchQuery]   = useState('');
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [wsConnected, setWsConnected] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showTokenModal, setShowTokenModal] = useState(false);
-  const [tokenCopied, setTokenCopied]   = useState(false);
-  const [deletingId, setDeletingId]     = useState(null);
+  const [tokenCopied, setTokenCopied] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     axios.get('http://localhost:5000/api/sessions/my')
@@ -95,12 +81,12 @@ const Dashboard = () => {
       reconnectionAttempts: 5,
       reconnectionDelay: 3000,
     });
-    socket.on('connect',    () => setWsConnected(true));
+    socket.on('connect', () => setWsConnected(true));
     socket.on('disconnect', () => setWsConnected(false));
     socket.on('connect_error', () => setWsConnected(false));
-    socket.on('SESSION_CREATED',   p => setSessions(prev => prev.some(s => s._id === p._id) ? prev : [p, ...prev]));
+    socket.on('SESSION_CREATED', p => setSessions(prev => prev.some(s => s._id === p._id) ? prev : [p, ...prev]));
     socket.on('SESSION_COMPLETED', p => setSessions(prev => prev.map(s => s._id === p._id ? { ...s, ...p } : s)));
-    socket.on('SESSION_DELETED',   p => setSessions(prev => prev.filter(s => s._id !== p.sessionId)));
+    socket.on('SESSION_DELETED', p => setSessions(prev => prev.filter(s => s._id !== p.sessionId)));
     return () => socket.disconnect();
   }, [user]);
 
@@ -133,23 +119,23 @@ const Dashboard = () => {
     (statusFilter === 'all' || s.status === statusFilter)
   );
 
-  const totalSessions     = sessions.length;
-  const activeSessions    = sessions.filter(s => s.status === 'recording').length;
+  const totalSessions = sessions.length;
+  const activeSessions = sessions.filter(s => s.status === 'recording').length;
   const completedSessions = sessions.filter(s => s.status === 'completed').length;
 
   // ── colour helpers
   const T = {
-    bg:      '#09090b',
+    bg: '#09090b',
     surface: '#111113',
-    surface2:'#161618',
-    border:  'rgba(255,255,255,0.07)',
-    cyan:    '#22d3ee',
-    amber:   '#fbbf24',
-    green:   '#4ade80',
-    rose:    '#f87171',
-    text:    '#f4f4f5',
-    sub:     '#a1a1aa',
-    muted:   '#52525b',
+    surface2: '#161618',
+    border: 'rgba(255,255,255,0.07)',
+    cyan: '#22d3ee',
+    amber: '#fbbf24',
+    green: '#4ade80',
+    rose: '#f87171',
+    text: '#f4f4f5',
+    sub: '#a1a1aa',
+    muted: '#52525b',
   };
 
   return (
@@ -162,9 +148,9 @@ const Dashboard = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, rgba(34,211,238,0.15), rgba(251,191,36,0.1))', border: '1px solid rgba(34,211,238,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.cyan }}>
             <svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-              <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2"/>
-              <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
+              <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" />
+              <polygon points="11,10.5 14,12 11,13.5" fill="currentColor" />
             </svg>
           </div>
           <span style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.4px', color: T.text }}>
@@ -202,9 +188,9 @@ const Dashboard = () => {
         {/* ── Stats ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 14, marginBottom: 24 }}>
           {[
-            { label: 'Total Reports',  value: totalSessions,     icon: FileText,  color: T.cyan,  glow: 'rgba(34,211,238,0.1)' },
-            { label: 'Live Streams',   value: activeSessions,    icon: Activity,  color: T.rose,  glow: 'rgba(248,113,113,0.1)' },
-            { label: 'Completed Runs', value: completedSessions, icon: Video,     color: T.green, glow: 'rgba(74,222,128,0.1)'  },
+            { label: 'Total Reports', value: totalSessions, icon: FileText, color: T.cyan, glow: 'rgba(34,211,238,0.1)' },
+            { label: 'Live Streams', value: activeSessions, icon: Activity, color: T.rose, glow: 'rgba(248,113,113,0.1)' },
+            { label: 'Completed Runs', value: completedSessions, icon: Video, color: T.green, glow: 'rgba(74,222,128,0.1)' },
           ].map(({ label, value, icon: Icon, color, glow }) => (
             <div key={label} className="stat-card" style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: '18px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div>
@@ -234,8 +220,8 @@ const Dashboard = () => {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{ width: '100%', height: 34, paddingLeft: 30, paddingRight: 12, background: T.bg, border: `1px solid ${T.border}`, borderRadius: 8, fontSize: 12, color: T.text, outline: 'none', fontFamily: 'inherit', transition: 'border-color 0.2s' }}
-              onFocus={e  => e.target.style.borderColor = 'rgba(34,211,238,0.4)'}
-              onBlur={e   => e.target.style.borderColor = T.border}
+              onFocus={e => e.target.style.borderColor = 'rgba(34,211,238,0.4)'}
+              onBlur={e => e.target.style.borderColor = T.border}
             />
           </div>
 
@@ -293,9 +279,9 @@ const Dashboard = () => {
                       <>
                         <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(34,211,238,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(34,211,238,0.03) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
                         <svg className="card-thumb-icon" style={{ color: '#27272a', transition: 'all 0.25s', position: 'relative', zIndex: 1, width: 28, height: 28 }} viewBox="0 0 24 24" fill="none">
-                          <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                          <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8"/>
-                          <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
+                          <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
+                          <polygon points="11,10.5 14,12 11,13.5" fill="currentColor" />
                         </svg>
                         {/* Play overlay */}
                         <div className="card-play-overlay" style={{ position: 'absolute', inset: 0, background: 'rgba(9,9,11,0.7)', backdropFilter: 'blur(2px)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s' }}>

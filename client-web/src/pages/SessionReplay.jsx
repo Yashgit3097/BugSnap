@@ -7,27 +7,27 @@ import {
   Search, AlertTriangle, Info, Clock, ExternalLink
 } from 'lucide-react';
 
-// ─── Dark DevTools color palette ─────────────────────────────────────────────
+// ─── Design tokens — matches Intro.jsx / Dashboard.jsx ──────────────────────
 const DT = {
-  bg: '#1e1e2e',   // panel background
-  bgAlt: '#181825',   // alternate row
-  bgActive: '#2a2a3d',   // highlighted row bg
-  bgHover: '#25253a',   // hover state
-  surface: '#252535',   // toolbar/header bg
-  border: '#313149',   // dividers
-  text: '#cdd6f4',   // primary text
-  textDim: '#6c7086',   // muted / timestamps
-  textSub: '#a6adc8',   // secondary text
-  accent: '#89b4fa',   // blue (numbers, method GET)
-  accentHL: 'rgba(137,180,250,0.12)', // active border color bg tint
-  green: '#a6e3a1',   // success / POST
-  red: '#f38ba8',   // error / DELETE
-  yellow: '#f9e2af',   // warn / PATCH PUT
-  purple: '#cba6f7',   // object keys
-  cyan: '#89dceb',   // strings
-  orange: '#fab387',   // actions accent
-  borderHL: '#89b4fa',   // active row left border
-  tag: '#313149',   // badge background
+  bg:       '#09090b',              // zinc-950 main bg
+  bgAlt:    '#0d0d10',              // alternate row
+  bgActive: '#131318',              // highlighted row bg
+  bgHover:  '#111113',              // hover state
+  surface:  '#111113',              // toolbar / header
+  border:   'rgba(255,255,255,0.07)',
+  text:     '#f4f4f5',              // zinc-100
+  textDim:  '#52525b',              // zinc-600 muted / timestamps
+  textSub:  '#a1a1aa',              // zinc-400 secondary
+  accent:   '#22d3ee',              // cyan-400 — primary
+  accentHL: 'rgba(34,211,238,0.09)',
+  green:    '#4ade80',              // success / POST
+  red:      '#f87171',              // error / DELETE
+  yellow:   '#fbbf24',              // warn / PATCH PUT — amber
+  purple:   '#c4b5fd',              // object keys — violet-300
+  cyan:     '#67e8f9',              // strings — cyan-300
+  orange:   '#fb923c',              // actions accent
+  borderHL: '#22d3ee',              // active row left border
+  tag:      'rgba(255,255,255,0.06)',
 };
 
 // ─── Console Data Normalizer ───────────────────────────────────────────────────
@@ -182,6 +182,173 @@ const ConsoleArg = ({ arg: rawArg, isTopLevel = false }) => {
   return <span style={{ color: DT.text, fontFamily: 'monospace' }}>{String(value || rawArg)}</span>;
 };
 
+// ─── JSON Tree Viewer ─────────────────────────────────────────────────────────
+
+/**
+ * Recursive JSON node with expand/collapse, syntax highlighting,
+ * and item-count preview when collapsed.
+ */
+const JsonNode = ({ value, keyName = null, depth = 0, defaultExpanded = false }) => {
+  const [expanded, setExpanded] = useState(defaultExpanded || depth === 0);
+
+  const toggle = (e) => { e.stopPropagation(); setExpanded(x => !x); };
+
+  const indent = { paddingLeft: depth === 0 ? 0 : 16, borderLeft: depth > 0 ? `1px solid rgba(255,255,255,0.06)` : 'none', marginLeft: depth > 0 ? 8 : 0 };
+
+  const KeyLabel = () => keyName !== null ? (
+    <span>
+      <span style={{ color: DT.purple, fontWeight: 500 }}>"{keyName}"</span>
+      <span style={{ color: DT.textDim }}>: </span>
+    </span>
+  ) : null;
+
+  // ── Primitives ──
+  if (value === null)      return <div style={{ fontSize: 12, lineHeight: 1.8 }}><KeyLabel /><span style={{ color: DT.textDim, fontStyle: 'italic' }}>null</span></div>;
+  if (value === undefined) return <div style={{ fontSize: 12, lineHeight: 1.8 }}><KeyLabel /><span style={{ color: DT.textDim, fontStyle: 'italic' }}>undefined</span></div>;
+  if (typeof value === 'boolean') return <div style={{ fontSize: 12, lineHeight: 1.8 }}><KeyLabel /><span style={{ color: DT.yellow, fontWeight: 600 }}>{String(value)}</span></div>;
+  if (typeof value === 'number')  return <div style={{ fontSize: 12, lineHeight: 1.8 }}><KeyLabel /><span style={{ color: DT.accent }}>{String(value)}</span></div>;
+  if (typeof value === 'string')  return (
+    <div style={{ fontSize: 12, lineHeight: 1.8, wordBreak: 'break-all' }}>
+      <KeyLabel /><span style={{ color: DT.cyan }}>"</span><span style={{ color: DT.cyan }}>{value}</span><span style={{ color: DT.cyan }}>"</span>
+    </div>
+  );
+
+  // ── Array ──
+  if (Array.isArray(value)) {
+    const len = value.length;
+    return (
+      <div style={depth > 0 ? indent : {}}>
+        <div onClick={toggle} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, lineHeight: 1.8 }}>
+          <span style={{ fontSize: 9, color: DT.textDim, width: 10, display: 'inline-block', textAlign: 'center', flexShrink: 0 }}>{expanded ? '▼' : '▶'}</span>
+          <KeyLabel />
+          <span style={{ color: DT.textDim }}>[</span>
+          {!expanded && (
+            <span style={{ color: DT.textDim, fontStyle: 'italic', fontSize: 11 }}>
+              {len} {len === 1 ? 'item' : 'items'}
+            </span>
+          )}
+          {!expanded && <span style={{ color: DT.textDim }}>]</span>}
+        </div>
+        {expanded && (
+          <div style={{ paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,0.06)', marginLeft: 4 }}>
+            {value.map((item, i) => (
+              <JsonNode key={i} keyName={i} value={item} depth={depth + 1} defaultExpanded={false} />
+            ))}
+            <div style={{ fontSize: 12, lineHeight: 1.8, color: DT.textDim }}>]</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Object ──
+  if (typeof value === 'object') {
+    const keys = Object.keys(value);
+    return (
+      <div style={depth > 0 ? indent : {}}>
+        <div onClick={toggle} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, lineHeight: 1.8 }}>
+          <span style={{ fontSize: 9, color: DT.textDim, width: 10, display: 'inline-block', textAlign: 'center', flexShrink: 0 }}>{expanded ? '▼' : '▶'}</span>
+          <KeyLabel />
+          <span style={{ color: DT.textDim }}>{'{'}</span>
+          {!expanded && (
+            <span style={{ color: DT.textDim, fontStyle: 'italic', fontSize: 11 }}>
+              {keys.length} {keys.length === 1 ? 'key' : 'keys'}
+            </span>
+          )}
+          {!expanded && <span style={{ color: DT.textDim }}>{'}'}</span>}
+        </div>
+        {expanded && (
+          <div style={{ paddingLeft: 16, borderLeft: '1px solid rgba(255,255,255,0.06)', marginLeft: 4 }}>
+            {keys.map(k => (
+              <JsonNode key={k} keyName={k} value={value[k]} depth={depth + 1} defaultExpanded={false} />
+            ))}
+            <div style={{ fontSize: 12, lineHeight: 1.8, color: DT.textDim }}>{'}'}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return <div style={{ fontSize: 12, lineHeight: 1.8, color: DT.text }}><KeyLabel />{String(value)}</div>;
+};
+
+/**
+ * JsonViewer — wraps JsonNode with a copy button, line count badge,
+ * and a raw/tree toggle. Falls back to plain <pre> for non-JSON.
+ */
+const JsonViewer = ({ value }) => {
+  const [copied, setCopied] = useState(false);
+  const [viewRaw, setViewRaw] = useState(false);
+
+  if (!value) {
+    return <span style={{ color: DT.textDim, fontStyle: 'italic', fontSize: 11 }}>Empty</span>;
+  }
+
+  let parsed = null;
+  let isJSON = false;
+  let rawStr = '';
+
+  try {
+    parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    rawStr = JSON.stringify(parsed, null, 2);
+    isJSON = typeof parsed === 'object' && parsed !== null;
+  } catch {
+    rawStr = String(value);
+  }
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(rawStr).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    });
+  };
+
+  const lineCount = rawStr.split('\n').length;
+
+  return (
+    <div style={{ background: DT.bgAlt, border: `1px solid ${DT.border}`, borderRadius: 10, overflow: 'hidden' }}>
+      {/* Toolbar */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '5px 10px', background: 'rgba(255,255,255,0.03)', borderBottom: `1px solid ${DT.border}` }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10, color: DT.textDim, fontFamily: "'JetBrains Mono', monospace" }}>
+            {isJSON ? (Array.isArray(parsed) ? `Array · ${parsed.length} items` : `Object · ${Object.keys(parsed).length} keys`) : 'Plain text'}
+          </span>
+          <span style={{ fontSize: 10, color: DT.muted, fontFamily: "'JetBrains Mono', monospace", background: 'rgba(255,255,255,0.04)', border: `1px solid ${DT.border}`, padding: '1px 6px', borderRadius: 4 }}>
+            {lineCount} lines
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isJSON && (
+            <button
+              onClick={() => setViewRaw(x => !x)}
+              style={{ fontSize: 10, fontWeight: 600, color: viewRaw ? DT.accent : DT.textDim, background: viewRaw ? 'rgba(34,211,238,0.08)' : 'transparent', border: `1px solid ${viewRaw ? 'rgba(34,211,238,0.2)' : DT.border}`, borderRadius: 5, padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+            >
+              {viewRaw ? 'Tree' : 'Raw'}
+            </button>
+          )}
+          <button
+            onClick={handleCopy}
+            style={{ fontSize: 10, fontWeight: 600, color: copied ? DT.green : DT.textDim, background: copied ? 'rgba(74,222,128,0.08)' : 'transparent', border: `1px solid ${copied ? 'rgba(74,222,128,0.2)' : DT.border}`, borderRadius: 5, padding: '2px 8px', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            {copied ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: '10px 12px', maxHeight: 280, overflowY: 'auto', fontFamily: "'JetBrains Mono', 'Fira Code', 'Consolas', monospace" }}>
+        {isJSON && !viewRaw ? (
+          <JsonNode value={parsed} depth={0} defaultExpanded={true} />
+        ) : (
+          <pre style={{ fontSize: 11, color: DT.text, lineHeight: 1.7, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+            {rawStr}
+          </pre>
+        )}
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 const SessionReplay = () => {
   const { publicId } = useParams();
@@ -228,33 +395,8 @@ const SessionReplay = () => {
       .then(() => { setShareCopied(true); setTimeout(() => setShareCopied(false), 2000); });
   };
 
-  const renderJSONPayload = (val) => {
-    if (!val) return <span style={{ color: DT.textDim, fontStyle: 'italic', fontSize: 11 }}>Empty</span>;
-    try {
-      const parsed = typeof val === 'string' ? JSON.parse(val) : val;
-      return (
-        <pre style={{
-          fontSize: 11, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace",
-          background: DT.bgAlt, border: `1px solid ${DT.border}`, borderRadius: 6,
-          padding: '10px 12px', overflowX: 'auto', whiteSpace: 'pre-wrap',
-          wordBreak: 'break-all', color: DT.text, lineHeight: 1.6, margin: 0,
-        }}>
-          {JSON.stringify(parsed, null, 2)}
-        </pre>
-      );
-    } catch {
-      return (
-        <pre style={{
-          fontSize: 11, fontFamily: "'JetBrains Mono','Fira Code','Consolas',monospace",
-          background: DT.bgAlt, border: `1px solid ${DT.border}`, borderRadius: 6,
-          padding: '10px 12px', overflowX: 'auto', whiteSpace: 'pre-wrap',
-          wordBreak: 'break-all', color: DT.text, lineHeight: 1.6, margin: 0,
-        }}>
-          {String(val)}
-        </pre>
-      );
-    }
-  };
+  // renderJSONPayload now delegates to the JsonViewer component above
+  const renderJSONPayload = (val) => <JsonViewer value={val} />;
 
   const renderConsoleLog = (log) => {
     try {
@@ -315,11 +457,11 @@ const SessionReplay = () => {
   // ── Loading ───────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0f0f1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ minHeight: '100vh', background: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <style>{`@keyframes spin{to{transform:rotate(360deg);}}`}</style>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(137,180,250,0.15)', borderTopColor: '#89b4fa', borderRightColor: '#cba6f7', animation: 'spin 0.85s linear infinite', margin: '0 auto 14px' }} />
-          <p style={{ color: '#6c7086', fontSize: 12, fontFamily: 'Inter,sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Loading session…</p>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(34,211,238,0.15)', borderTopColor: '#22d3ee', borderRightColor: '#fbbf24', animation: 'spin 0.85s linear infinite', margin: '0 auto 14px' }} />
+          <p style={{ color: '#52525b', fontSize: 12, fontFamily: 'Inter,sans-serif', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Loading session…</p>
         </div>
       </div>
     );
@@ -328,13 +470,13 @@ const SessionReplay = () => {
   // ── Not Found ─────────────────────────────────────────────────────
   if (!data || !data.session) {
     return (
-      <div style={{ minHeight: '100vh', background: '#0f0f1a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
-        <div style={{ padding: 20, background: 'rgba(243,139,168,0.1)', border: '1px solid rgba(243,139,168,0.3)', borderRadius: 16, color: '#f38ba8' }}><AlertTriangle size={36} /></div>
+      <div style={{ minHeight: '100vh', background: '#09090b', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+        <div style={{ padding: 20, background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 16, color: '#f87171' }}><AlertTriangle size={36} /></div>
         <div style={{ textAlign: 'center' }}>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#cdd6f4', marginBottom: 8 }}>Session Not Found</h2>
-          <p style={{ color: '#6c7086', fontSize: 14 }}>This bug report may have expired or been deleted.</p>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: '#f4f4f5', marginBottom: 8 }}>Session Not Found</h2>
+          <p style={{ color: '#52525b', fontSize: 14 }}>This bug report may have expired or been deleted.</p>
         </div>
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: 'white', fontWeight: 600, fontSize: 13, padding: '10px 20px', borderRadius: 12, textDecoration: 'none' }}>
+        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#22d3ee', color: '#09090b', fontWeight: 700, fontSize: 13, padding: '10px 20px', borderRadius: 12, textDecoration: 'none' }}>
           <ArrowLeft size={14} /> Back to Dashboard
         </Link>
       </div>
@@ -350,55 +492,54 @@ const SessionReplay = () => {
 
   // ── Main View ─────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#0f0f1a', fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", WebkitFontSmoothing: 'antialiased' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#09090b', fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", WebkitFontSmoothing: 'antialiased' }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        *, *::before, *::after { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(137,180,250,0.15); border-radius: 99px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(137,180,250,0.35); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(34,211,238,0.25); }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulseGlow {
-          0%,100% { box-shadow: 0 0 0 0 rgba(137,180,250,0.4); }
-          50%      { box-shadow: 0 0 0 4px rgba(137,180,250,0); }
+          0%,100% { box-shadow: 0 0 0 0 rgba(34,211,238,0.4); }
+          50%      { box-shadow: 0 0 0 4px rgba(34,211,238,0); }
         }
         @keyframes hlFlash {
-          0%   { background-color: rgba(137,180,250,0.18); }
-          100% { background-color: rgba(137,180,250,0.06); }
+          0%   { background-color: rgba(34,211,238,0.14); }
+          100% { background-color: rgba(34,211,238,0.05); }
         }
         @keyframes hlFlashAction {
-          0%   { background-color: rgba(137,180,250,0.2); }
-          100% { background-color: rgba(137,180,250,0.06); }
+          0%   { background-color: rgba(34,211,238,0.16); }
+          100% { background-color: rgba(34,211,238,0.05); }
         }
       `}</style>
 
       {/* ════ HEADER ════ */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 52, flexShrink: 0, background: '#14141f', borderBottom: '1px solid rgba(255,255,255,0.06)', zIndex: 20 }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px', height: 56, flexShrink: 0, background: 'rgba(9,9,11,0.9)', backdropFilter: 'blur(18px)', borderBottom: `1px solid ${DT.border}`, zIndex: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <Link to="/" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)', color: '#6c7086', textDecoration: 'none', transition: 'all 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#cdd6f4'; }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = '#6c7086'; }}>
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.05)', border: `1px solid ${DT.border}`, color: DT.textDim, textDecoration: 'none', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = DT.text; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = DT.textDim; }}>
             <ArrowLeft size={14} />
           </Link>
-          <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.06)' }} />
+          <div style={{ width: 1, height: 18, background: DT.border }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#89b4fa' }}>
-              <svg width={14} height={14} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="1.8" />
-                <path d="M12 7v10M7 12h10" stroke="currentColor" strokeWidth="1" strokeLinecap="round" opacity="0.6"/>
+            <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg, rgba(34,211,238,0.15), rgba(251,191,36,0.1))', border: '1px solid rgba(34,211,238,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: DT.accent }}>
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2" />
                 <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
               </svg>
             </div>
             <div>
-              <h1 style={{ fontSize: 13, fontWeight: 700, color: '#cdd6f4', margin: 0, lineHeight: 1.2 }}>{session.title}</h1>
+              <h1 style={{ fontSize: 13, fontWeight: 700, color: DT.text, margin: 0, lineHeight: 1.2 }}>{session.title}</h1>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-                <span style={{ fontSize: 10, color: '#6c7086', display: 'flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ fontSize: 10, color: DT.textDim, display: 'flex', alignItems: 'center', gap: 3 }}>
                   <Calendar size={9} />{new Date(session.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
                 </span>
                 {session.browserInfo && (
-                  <span style={{ fontSize: 10, color: '#6c7086', display: 'flex', alignItems: 'center', gap: 3 }}>
+                  <span style={{ fontSize: 10, color: DT.textDim, display: 'flex', alignItems: 'center', gap: 3 }}>
                     <Laptop size={9} />{session.browserInfo.browser} · {session.browserInfo.os}
                   </span>
                 )}
@@ -409,17 +550,17 @@ const SessionReplay = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {[
-            { label: `${logs.length} logs`, color: DT.accent },
+            { label: `${logs.length} logs`,              color: DT.accent },
             { label: `${networkRequests.length} requests`, color: DT.green },
-            { label: `${actions.length} actions`, color: DT.orange },
+            { label: `${actions.length} actions`,         color: DT.orange },
           ].map(({ label, color }) => (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 6, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', fontSize: 10, color: '#6c7086', fontFamily: 'monospace', fontWeight: 600 }}>
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 6, background: DT.tag, border: `1px solid ${DT.border}`, fontSize: 10, color: DT.textDim, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
               <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, display: 'inline-block' }} />
               {label}
             </div>
           ))}
-          <div style={{ width: 1, height: 18, background: 'rgba(255,255,255,0.06)' }} />
-          <button onClick={handleShareClick} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 8, background: shareCopied ? 'rgba(166,227,161,0.12)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)', border: shareCopied ? '1px solid rgba(166,227,161,0.3)' : 'none', color: shareCopied ? DT.green : 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', outline: 'none', transition: 'all 0.2s', fontFamily: 'inherit' }}>
+          <div style={{ width: 1, height: 18, background: DT.border }} />
+          <button onClick={handleShareClick} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 9, background: shareCopied ? 'rgba(74,222,128,0.12)' : DT.accent, border: shareCopied ? '1px solid rgba(74,222,128,0.3)' : 'none', color: shareCopied ? DT.green : '#09090b', fontSize: 12, fontWeight: 700, cursor: 'pointer', outline: 'none', transition: 'all 0.2s', fontFamily: 'inherit' }}>
             {shareCopied ? <><Check size={12} /> Copied!</> : <><Share2 size={12} /> Share</>}
           </button>
         </div>
@@ -429,17 +570,17 @@ const SessionReplay = () => {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         {/* ═══ LEFT: VIDEO ═══ */}
-        <div style={{ width: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#0f0f1a', borderRight: '1px solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+        <div style={{ width: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', background: '#09090b', borderRight: `1px solid ${DT.border}`, overflow: 'hidden' }}>
           {/* Player titlebar */}
-          <div style={{ background: '#14141f', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0 }}>
+          <div style={{ background: DT.surface, padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${DT.border}`, flexShrink: 0 }}>
             <div style={{ display: 'flex', gap: 6 }}>
-              {['#ff5f57', '#febc2e', '#28c840'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.75 }} />)}
+              {['#f87171','#fbbf24','#4ade80'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.5 }} />)}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#6c7086', fontFamily: 'monospace' }}>
-              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#89b4fa', display: 'inline-block', animation: 'pulseGlow 2s infinite' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: DT.textDim, fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: DT.accent, display: 'inline-block', animation: 'pulseGlow 2s infinite' }} />
               Session Replay
             </div>
-            <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#89b4fa', background: 'rgba(137,180,250,0.08)', border: '1px solid rgba(137,180,250,0.18)', borderRadius: 5, padding: '2px 8px', letterSpacing: 1 }}>
+            <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 10, color: DT.accent, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.2)', borderRadius: 5, padding: '2px 8px', letterSpacing: 1 }}>
               {formatTime(currentTime)}
             </div>
           </div>
@@ -452,23 +593,23 @@ const SessionReplay = () => {
 
           {/* Env bar */}
           {session.browserInfo && (
-            <div style={{ flexShrink: 0, padding: '7px 14px', borderTop: '1px solid rgba(255,255,255,0.05)', background: '#14141f', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ flexShrink: 0, padding: '7px 14px', borderTop: `1px solid ${DT.border}`, background: DT.surface, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ padding: 6, borderRadius: 7, background: 'rgba(137,180,250,0.08)', border: '1px solid rgba(137,180,250,0.15)', color: '#89b4fa' }}><Laptop size={11} /></div>
+                <div style={{ padding: 6, borderRadius: 7, background: 'rgba(34,211,238,0.08)', border: '1px solid rgba(34,211,238,0.18)', color: DT.accent }}><Laptop size={11} /></div>
                 <div>
-                  <div style={{ fontSize: 9, color: '#4b5060', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Environment</div>
-                  <div style={{ fontSize: 11, color: '#a6adc8', fontWeight: 600, marginTop: 1 }}>{session.browserInfo.os || 'OS'}</div>
+                  <div style={{ fontSize: 9, color: DT.textDim, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Environment</div>
+                  <div style={{ fontSize: 11, color: DT.textSub, fontWeight: 600, marginTop: 1 }}>{session.browserInfo.os || 'OS'}</div>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6c7086' }}>
-                  <Cpu size={10} style={{ color: '#89b4fa' }} />
-                  <span style={{ color: '#a6adc8', fontWeight: 600 }}>{session.browserInfo.browser || 'N/A'}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: DT.textDim }}>
+                  <Cpu size={10} style={{ color: DT.accent }} />
+                  <span style={{ color: DT.textSub, fontWeight: 600 }}>{session.browserInfo.browser || 'N/A'}</span>
                 </div>
                 {session.browserInfo.screen && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#6c7086' }}>
-                    <Monitor size={10} style={{ color: '#89b4fa' }} />
-                    <span style={{ color: '#a6adc8', fontWeight: 600 }}>{session.browserInfo.screen}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: DT.textDim }}>
+                    <Monitor size={10} style={{ color: DT.accent }} />
+                    <span style={{ color: DT.textSub, fontWeight: 600 }}>{session.browserInfo.screen}</span>
                   </div>
                 )}
               </div>
@@ -491,7 +632,7 @@ const SessionReplay = () => {
                 return (
                   <button key={tab.id} onClick={() => { setActiveTab(tab.id); setSelectedNetworkReq(null); }} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '0 16px', height: 36, fontSize: 12, fontWeight: isActive ? 600 : 400, color: isActive ? DT.accent : DT.textDim, background: isActive ? DT.bg : 'transparent', border: 'none', borderBottom: isActive ? `2px solid ${DT.accent}` : `2px solid transparent`, cursor: 'pointer', outline: 'none', transition: 'all 0.15s', fontFamily: 'Inter,sans-serif' }}>
                     {tab.label}
-                    <span style={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: isActive ? 'rgba(137,180,250,0.12)' : DT.tag, color: isActive ? DT.accent : DT.textDim }}>
+                    <span style={{ fontSize: 9, fontFamily: 'monospace', fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: isActive ? 'rgba(34,211,238,0.12)' : DT.tag, color: isActive ? DT.accent : DT.textDim }}>
                       {tab.count}
                     </span>
                   </button>
@@ -533,8 +674,8 @@ const SessionReplay = () => {
                     const isActive = i === activeLogIndex;
 
                     const rowBg = isActive
-                      ? (isErr ? 'rgba(243,139,168,0.08)' : isWarn ? 'rgba(249,226,175,0.07)' : DT.accentHL)
-                      : (isErr ? 'rgba(243,139,168,0.04)' : isWarn ? 'rgba(249,226,175,0.04)' : (i % 2 === 0 ? DT.bg : DT.bgAlt));
+                      ? (isErr ? 'rgba(248,113,113,0.1)' : isWarn ? 'rgba(251,191,36,0.08)' : DT.accentHL)
+                      : (isErr ? 'rgba(248,113,113,0.05)' : isWarn ? 'rgba(251,191,36,0.04)' : (i % 2 === 0 ? DT.bg : DT.bgAlt));
 
                     const borderLeft = isActive
                       ? (isErr ? `3px solid ${DT.red}` : isWarn ? `3px solid ${DT.yellow}` : `3px solid ${DT.borderHL}`)
@@ -603,7 +744,7 @@ const SessionReplay = () => {
                       const isNetErr = req.status === 0 || req.status >= 400;
                       const isSel = selectedNetworkReq?._id === req._id;
                       const isActive = i === activeNetIndex;
-                      const rowBg = isSel ? DT.bgActive : isActive ? 'rgba(137,180,250,0.06)' : (i % 2 === 0 ? DT.bg : DT.bgAlt);
+                      const rowBg = isSel ? DT.bgActive : isActive ? 'rgba(34,211,238,0.06)' : (i % 2 === 0 ? DT.bg : DT.bgAlt);
 
                       return (
                         <button key={req._id || i} ref={isActive ? activeNetRef : null} onClick={() => setSelectedNetworkReq(req)}
@@ -707,9 +848,9 @@ const SessionReplay = () => {
                       <div key={act._id || i} ref={isActive ? activeActRef : null}
                         style={{ display: 'flex', alignItems: 'flex-start', gap: 10, transition: 'all 0.3s ease' }}>
                         {/* Timeline dot */}
-                        <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 10, background: isActive ? DT.accent : DT.textDim, border: `2px solid ${isActive ? DT.accent : DT.border}`, boxShadow: isActive ? `0 0 0 3px rgba(137,180,250,0.15)` : 'none', transition: 'all 0.3s ease' }} />
+                        <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 10, background: isActive ? DT.accent : DT.textDim, border: `2px solid ${isActive ? DT.accent : DT.border}`, boxShadow: isActive ? `0 0 0 3px rgba(34,211,238,0.18)` : 'none', transition: 'all 0.3s ease' }} />
                         {/* Card — same darkness always, only border+shadow changes when active */}
-                        <div style={{ flex: 1, background: DT.surface, border: isActive ? `1px solid ${DT.accent}30` : `1px solid ${DT.border}`, borderRadius: 8, padding: '7px 11px', transition: 'all 0.3s ease', boxShadow: isActive ? `0 0 0 1px ${DT.accent}20, 0 2px 12px rgba(137,180,250,0.07)` : 'none', animation: isActive ? 'hlFlashAction 1.5s ease-out forwards' : 'none' }}>
+                        <div style={{ flex: 1, background: DT.surface, border: isActive ? `1px solid rgba(34,211,238,0.25)` : `1px solid ${DT.border}`, borderRadius: 8, padding: '7px 11px', transition: 'all 0.3s ease', boxShadow: isActive ? `0 0 0 1px rgba(34,211,238,0.1), 0 2px 12px rgba(34,211,238,0.06)` : 'none', animation: isActive ? 'hlFlashAction 1.5s ease-out forwards' : 'none' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               {isActive && <span style={{ width: 4, height: 4, borderRadius: '50%', background: DT.accent, display: 'inline-block', animation: 'pulseGlow 1.5s infinite', flexShrink: 0 }} />}
@@ -721,7 +862,7 @@ const SessionReplay = () => {
                           </div>
                           <div style={{ fontSize: 11, color: DT.textSub }}>
                             <span style={{ color: DT.textDim }}>Target: </span>
-                            <code style={{ fontSize: 10, color: DT.accent, background: 'rgba(137,180,250,0.08)', padding: '1px 6px', borderRadius: 4, fontFamily: 'monospace' }}>
+                            <code style={{ fontSize: 10, color: DT.accent, background: 'rgba(34,211,238,0.08)', padding: '1px 6px', borderRadius: 4, fontFamily: 'monospace' }}>
                               {act.element}
                             </code>
                           </div>

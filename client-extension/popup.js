@@ -1,18 +1,3 @@
-/* ================================================================
-   popup.js  –  Extension Popup controller (Premium UI Edition)
-
-   RESPONSIBILITIES:
-   1. Validates auth JWT token in local storage.
-   2. Syncs and renders corresponding premium UI views:
-      - Loading
-      - Not Logged In
-      - Not Recordable (chrome:// pages etc.)
-      - Ready to Record
-      - Recording in Progress (with running duration timer)
-      - Uploading Spinner
-      - Success (with shareable session link)
-   ================================================================ */
-
 document.addEventListener('DOMContentLoaded', () => {
   const contentDiv = document.getElementById('content');
   const headerBadge = document.getElementById('headerStatusBadge');
@@ -20,14 +5,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const headerText = document.getElementById('headerStatusText');
   let timerInterval = null;
 
-  // ── Header Status Helper ──────────────────────────────────────
+  //for setting header status badge (color + text)
   function setHeaderStatus(type, label) {
     headerBadge.className = `status-badge ${type}`;
     headerDot.className = `status-dot-sm${type === 'recording' ? ' pulse-red' : type === 'ready' ? ' pulse-green' : ''}`;
     headerText.textContent = label;
   }
 
-  // ── Content Transition Helper ─────────────────────────────────
+  //renders the main content area with a fade-in animation
   function renderContent(html) {
     contentDiv.style.opacity = '0';
     contentDiv.style.transform = 'translateY(4px)';
@@ -39,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 100);
   }
 
-  // ── Sync token from active dashboard tab ─────────────────────
+  //check and sync token from active tab's localStorage (if on localhost) to extension storage, then determine which view to render based on auth + recording state
   chrome.tabs.query({ url: ['http://localhost:5173/*', 'http://127.0.0.1:5173/*'] }, (tabs) => {
     if (tabs && tabs.length > 0) {
       chrome.scripting.executeScript({
@@ -63,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ── Fetch state and draw view ─────────────────────────────────
+  //fetch states and show screens accordingly (loading → not logged in → ready/recording/uploading based on current recording state)
   function checkStateAndRender() {
     chrome.storage.local.get(['debugsnap_token'], (res) => {
       if (!res.debugsnap_token) {
@@ -101,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // ── STATE: NOT LOGGED IN ──────────────────────────────────────
+  //render if user not logged in function with button to open dashboard login page
   function renderNotLoggedIn() {
     setHeaderStatus('warning', 'Not signed in');
     renderContent(`
@@ -124,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 150);
   }
 
-  // ── STATE: NOT RECORDABLE PAGE ────────────────────────────────
+  //for showing screen that is not recordable due to Chrome restrictions (chrome:// pages, new tab page, etc.)
   function renderNotRecordable() {
     setHeaderStatus('warning', 'Unavailable');
     renderContent(`
@@ -136,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `);
   }
 
-  // ── STATE: READY ──────────────────────────────────────────────
+  //render ready to record screen with start button, also showing last error if there was one from a failed recording attempt
   function renderReady(errorMsg = '') {
     setHeaderStatus('ready', 'Ready');
     renderContent(`
@@ -164,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <span>Console logs, network events &amp; screen video will be captured.</span>
       </div>
     `);
-
+    //attach click listener to start recording button after rendering, with a slight delay to ensure elements are available in the DOM
     setTimeout(() => {
       const btn = document.getElementById('startBtn');
       if (!btn) return;
@@ -178,7 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <p class="sub-message">Select the screen, window or tab you want to capture.</p>
           </div>
         `);
-
+        //send message to background to start recording, background will handle opening the screen picker and starting capture, then respond with success or error which we handle accordingly
         chrome.runtime.sendMessage({ type: 'START_RECORDING' }, (response) => {
           if (chrome.runtime.lastError || !response || response.error) {
             const err = (response && response.error) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error starting recording.';
@@ -191,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 150);
   }
 
-  // ── STATE: RECORDING ──────────────────────────────────────────
+  //render recording in progress screen with timer and stop button, also handles stop button click to end recording and transition to uploading state, with error handling if stopping fails
   function renderRecording(startTime) {
     setHeaderStatus('recording', 'Recording');
     renderContent(`
@@ -212,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
         </button>
       </div>
     `);
-
+      //start timer to show recording duration
     function updateTimer() {
       const elapsedMs = Date.now() - startTime;
       const totalSec = Math.floor(elapsedMs / 1000);
@@ -226,7 +211,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTimer();
     clearInterval(timerInterval);
     timerInterval = setInterval(updateTimer, 1000);
-
+    //attach click listener to stop recording button after rendering, with a slight delay to ensure elements are available in the DOM, on click it sends message to background to stop recording, then shows uploading state, with error handling if stopping fails
     setTimeout(() => {
       const stopBtn = document.getElementById('stopBtn');
       if (!stopBtn) return;
@@ -240,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <p class="sub-message">Processing video and compiling your session data. Please do not close.</p>
           </div>
         `);
-
+          //send message to background to stop recording, background will handle stopping capture and transitioning to uploading state, then respond with success or error which we handle accordingly
         chrome.runtime.sendMessage({ type: 'STOP_RECORDING' }, (res) => {
           if (chrome.runtime.lastError || !res || res.error) {
             const err = (res && res.error) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || 'Unknown error stopping recording.';
@@ -267,7 +252,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 150);
   }
 
-  // ── STATE: UPLOADING ──────────────────────────────────────────
+  //render uploading state with spinner and message to not close the popup, also showing info about video processing on server
   function renderUploading() {
     setHeaderStatus('uploading', 'Uploading...');
     renderContent(`
@@ -283,7 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
     `);
   }
 
-  // ── STATE: SUCCESS ────────────────────────────────────────────
+  //render success screen with shareable link to replay, button to view replay which opens in new tab, and button to reset state and record new session, also handles copy link functionality with feedback on click, with a slight delay to ensure elements are available in the DOM before attaching listeners
   function renderSuccess(publicId) {
     setHeaderStatus('success', 'Uploaded!');
     const replayUrl = `http://localhost:5173/session/${publicId}`;

@@ -650,7 +650,7 @@ export default function Intro({ defaultTab = null }) {
           {/* ── Right: Code preview (Redesigned as Video Player) ── */}
           <div className="anim-slide-r" style={{ position: 'relative' }}>
             {/* floating stat pills */}
-            <div style={{ position: 'absolute', top: 156, right: -27, zIndex: 2 }}>
+            <div style={{ position: 'absolute', top: 256, right: -27, zIndex: 2 }}>
               <div className="stat-pill">
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', animation: 'pulse-ring 2s infinite' }} />
                 Live session active

@@ -647,43 +647,30 @@ export default function Intro({ defaultTab = null }) {
             </div>
           </div>
 
-          {/* ── Right: Code preview ── */}
+          {/* ── Right: Code preview (Redesigned as Video Player) ── */}
           <div className="anim-slide-r" style={{ position: 'relative' }}>
             {/* floating stat pills */}
-            <div style={{ position: 'absolute', top: -16, right: -8, zIndex: 2 }}>
+            <div style={{ position: 'absolute', top: 156, right: -27, zIndex: 2 }}>
               <div className="stat-pill">
                 <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', animation: 'pulse-ring 2s infinite' }} />
                 Live session active
               </div>
             </div>
-            <div style={{ position: 'absolute', bottom: 0, left: -41, zIndex: 2 }}>
+            <div style={{ position: 'absolute', bottom: 258, left: -41, zIndex: 2 }}>
               <div className="stat-pill">
                 <span style={{ color: '#f87171', fontWeight: 700 }}>2</span> errors captured
               </div>
             </div>
 
-            <div className="code-block">
-              <div className="code-bar">
-                <div className="code-dot" style={{ background: '#f87171' }} />
-                <div className="code-dot" style={{ background: '#fbbf24' }} />
-                <div className="code-dot" style={{ background: '#4ade80' }} />
-                <span style={{ marginLeft: 8, color: '#3f3f46', fontSize: 11, fontFamily: "'JetBrains Mono', monospace" }}>session.js — DebugSnap</span>
-              </div>
-              <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 1 }}>
-                {CODE_LINES.map((line, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{ width: 28, color: '#3f3f46', fontSize: 11, userSelect: 'none', flexShrink: 0, textAlign: 'right', paddingRight: 16 }}>{i + 1}</span>
-                    <span>
-                      {line.tokens.map((tok, j) => (
-                        <span key={j} style={{ color: tok.c }}>{tok.t}</span>
-                      ))}
-                      {i === 13 && (
-                        <span style={{ display: 'inline-block', width: 2, height: '1em', background: '#22d3ee', marginLeft: 1, verticalAlign: 'text-bottom', animation: 'cursor-blink 1.1s step-end infinite' }} />
-                      )}
-                    </span>
-                  </div>
-                ))}
-              </div>
+            <div className="code-block" style={{ padding: 0, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)' }}>
+              <video
+                src="/intro.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+                style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 12 }}
+              />
             </div>
           </div>
         </section>

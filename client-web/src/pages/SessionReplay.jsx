@@ -4,7 +4,8 @@ import axios from 'axios';
 import {
   Terminal, Network, MousePointer2, Share2, ArrowLeft, Check,
   Server, FileCode, CornerDownRight, Laptop, Cpu, Monitor, Calendar,
-  Search, AlertTriangle, Info, Clock, ExternalLink
+  Search, AlertTriangle, Info, Clock, ExternalLink,
+  Play, Pause, Volume2, VolumeX, Maximize
 } from 'lucide-react';
 
 // ─── Design tokens — matches Intro.jsx / Dashboard.jsx ──────────────────────
@@ -361,7 +362,17 @@ const SessionReplay = () => {
   const [consoleFilter, setConsoleFilter] = useState('');
   const [networkFilter, setNetworkFilter] = useState('');
 
+  // Video player state
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [isMuted, setIsMuted] = useState(false);
+  const [scrubKey, setScrubKey] = useState(0);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+
+  // Removed cycleSpeed from here as it's directly in select onChange
+
   const videoRef = useRef(null);
+  const videoContainerRef = useRef(null);
   const consoleContainerRef = useRef(null);
   const networkContainerRef = useRef(null);
   const actionsContainerRef = useRef(null);
@@ -378,11 +389,69 @@ const SessionReplay = () => {
       .finally(() => setLoading(false));
   }, [publicId]);
 
+  const updateDuration = () => {
+    if (videoRef.current) {
+      const d = videoRef.current.duration;
+      if (d && !isNaN(d) && isFinite(d) && d > 0) {
+        setDuration(d);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (data?.session?.duration) {
+      setDuration(data.session.duration);
+    } else {
+      updateDuration();
+    }
+  }, [data]);
+
   const handleTimeUpdate = () => {
-    if (videoRef.current) setCurrentTime(videoRef.current.currentTime * 1000);
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime * 1000);
+      // Capture duration dynamically if not yet captured
+      const d = videoRef.current.duration;
+      if (d && !isNaN(d) && isFinite(d) && d > 0 && d !== duration) {
+        setDuration(d);
+      }
+    }
+  };
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (isPlaying) videoRef.current.pause();
+      else videoRef.current.play();
+    }
+  };
+
+  const handleSeek = (e) => {
+    const d = duration || videoRef.current?.duration;
+    if (videoRef.current && d && !isNaN(d) && isFinite(d)) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const targetTime = pos * d;
+      videoRef.current.currentTime = targetTime;
+      setCurrentTime(targetTime * 1000);
+      setScrubKey(k => k + 1); // trigger animation re-run
+      
+      // If the video has ended, seeking resets the ended state but it remains paused.
+      // Call pause() to force the browser to process the frame seek and update the UI.
+      if (videoRef.current.ended) {
+        videoRef.current.pause();
+      }
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      videoContainerRef.current?.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
   };
 
   const formatTime = (ms) => {
+    if (!ms || isNaN(ms) || !isFinite(ms)) return "00:00.0";
     const s = Math.floor(ms / 1000);
     const m = String(Math.floor(s / 60)).padStart(2, '0');
     const sec = String(s % 60).padStart(2, '0');
@@ -491,6 +560,8 @@ const SessionReplay = () => {
   };
 
   // ── Main View ─────────────────────────────────────────────────────
+  const animSuffix = scrubKey % 2 === 0 ? '1' : '2';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#09090b', fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", WebkitFontSmoothing: 'antialiased' }}>
       <style>{`
@@ -505,11 +576,19 @@ const SessionReplay = () => {
           0%,100% { box-shadow: 0 0 0 0 rgba(34,211,238,0.4); }
           50%      { box-shadow: 0 0 0 4px rgba(34,211,238,0); }
         }
-        @keyframes hlFlash {
+        @keyframes hlFlash1 {
           0%   { background-color: rgba(34,211,238,0.14); }
           100% { background-color: rgba(34,211,238,0.05); }
         }
-        @keyframes hlFlashAction {
+        @keyframes hlFlash2 {
+          0%   { background-color: rgba(34,211,238,0.14); }
+          100% { background-color: rgba(34,211,238,0.05); }
+        }
+        @keyframes hlFlashAction1 {
+          0%   { background-color: rgba(34,211,238,0.16); }
+          100% { background-color: rgba(34,211,238,0.05); }
+        }
+        @keyframes hlFlashAction2 {
           0%   { background-color: rgba(34,211,238,0.16); }
           100% { background-color: rgba(34,211,238,0.05); }
         }
@@ -586,9 +665,96 @@ const SessionReplay = () => {
           </div>
 
           {/* Video — fills remaining space */}
-          <div style={{ flex: 1, background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <video ref={videoRef} src={session.videoUrl} controls onTimeUpdate={handleTimeUpdate}
-              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+          <div ref={videoContainerRef} style={{ flex: 1, background: '#000', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={togglePlay}>
+              <video 
+                ref={videoRef} 
+                src={session.videoUrl} 
+                onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={updateDuration}
+                onDurationChange={updateDuration}
+                onCanPlay={updateDuration}
+                onPlay={() => {
+                  setIsPlaying(true);
+                  updateDuration();
+                }}
+                onPause={() => setIsPlaying(false)}
+                onEnded={() => setIsPlaying(false)}
+                style={{ width: '100%', height: '100%', objectFit: 'contain', cursor: 'pointer' }} 
+              />
+                
+              {/* Big Center Play Button Overlay */}
+              <div style={{ position: 'absolute', pointerEvents: 'none', width: 64, height: 64, borderRadius: '50%', background: 'rgba(9,9,11,0.5)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isPlaying ? 0 : 1, transform: isPlaying ? 'scale(1.2)' : 'scale(1)', transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }}>
+                <Play size={28} style={{ color: DT.text, marginLeft: 4 }} fill="currentColor" />
+              </div>
+            </div>
+            
+            {/* Custom Controls Bar */}
+            <div style={{ background: 'rgba(9,9,11,0.95)', backdropFilter: 'blur(10px)', borderTop: `1px solid ${DT.border}`, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 12, flexShrink: 0 }}>
+               {/* Progress Bar Container with larger hit area */}
+               <div 
+                 style={{ height: 16, display: 'flex', alignItems: 'center', cursor: 'pointer', margin: '-5px 0' }}
+                 onClick={handleSeek}
+               >
+                 <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.1)', borderRadius: 2, position: 'relative' }}>
+                    <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${(duration && isFinite(duration) && duration > 0) ? Math.min(100, Math.max(0, (currentTime / 1000 / duration) * 100)) : 0}%`, background: DT.accent, borderRadius: 2, boxShadow: '0 0 10px rgba(34,211,238,0.5)' }}>
+                       {/* Playhead dot */}
+                       <div style={{ position: 'absolute', right: -6, top: -4, width: 12, height: 12, borderRadius: '50%', background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.5)' }} />
+                    </div>
+                 </div>
+               </div>
+               
+               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                   <button onClick={togglePlay} style={{ background: 'none', border: 'none', color: DT.text, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                     {isPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+                   </button>
+                   <button onClick={() => {
+                     if (videoRef.current) {
+                       videoRef.current.muted = !isMuted;
+                       setIsMuted(!isMuted);
+                     }
+                   }} style={{ background: 'none', border: 'none', color: DT.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'color 0.2s' }}
+                   onMouseEnter={e => e.currentTarget.style.color = DT.text}
+                   onMouseLeave={e => e.currentTarget.style.color = DT.textDim}>
+                     {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                   </button>
+                   <span style={{ fontSize: 11, color: DT.textDim, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '0.02em' }}>
+                     <span style={{ color: DT.text }}>{formatTime(currentTime)}</span> <span style={{ opacity: 0.5 }}>/</span> {formatTime(duration * 1000)}
+                   </span>
+                 </div>
+                 
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                   <select 
+                     value={playbackSpeed}
+                     onChange={(e) => {
+                       const v = parseFloat(e.target.value);
+                       setPlaybackSpeed(v);
+                       if (videoRef.current) videoRef.current.playbackRate = v;
+                     }}
+                     style={{
+                       background: 'rgba(255,255,255,0.06)', 
+                       border: `1px solid ${DT.border}`, 
+                       borderRadius: 6, 
+                       color: DT.textDim, 
+                       fontSize: 10, 
+                       fontWeight: 700, 
+                       padding: '3px 4px', 
+                       cursor: 'pointer', 
+                       fontFamily: "'JetBrains Mono', monospace",
+                       outline: 'none'
+                     }}
+                   >
+                     {[0.25, 0.5, 1, 1.25, 1.5, 2].map(s => <option key={s} value={s} style={{ background: DT.bg, color: DT.text }}>{s}x</option>)}
+                   </select>
+                   <button onClick={toggleFullscreen} style={{ background: 'none', border: 'none', color: DT.textDim, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, transition: 'color 0.2s' }}
+                   onMouseEnter={e => e.currentTarget.style.color = DT.text}
+                   onMouseLeave={e => e.currentTarget.style.color = DT.textDim}>
+                     <Maximize size={15} />
+                   </button>
+                 </div>
+               </div>
+            </div>
           </div>
 
           {/* Env bar */}
@@ -683,7 +849,7 @@ const SessionReplay = () => {
 
                     return (
                       <div key={log._id || i} ref={isActive ? activeLogRef : null}
-                        style={{ display: 'flex', alignItems: 'flex-start', minHeight: 22, borderLeft, background: rowBg, borderBottom: `1px solid ${DT.bgAlt}`, transition: 'background 0.35s ease', animation: isActive ? 'hlFlash 1.5s ease-out forwards' : 'none' }}>
+                        style={{ display: 'flex', alignItems: 'flex-start', minHeight: 22, borderLeft, background: rowBg, borderBottom: `1px solid ${DT.bgAlt}`, transition: 'background 0.35s ease', animation: isActive ? `hlFlash${animSuffix} 1.5s ease-out forwards` : 'none' }}>
                         {/* Timestamp */}
                         <span style={{ fontSize: 9, fontFamily: 'monospace', color: DT.textDim, padding: '4px 6px', flexShrink: 0, whiteSpace: 'nowrap', borderRight: `1px solid ${DT.border}`, minWidth: 60, textAlign: 'right' }}>
                           {formatTime(log.time)}
@@ -748,7 +914,7 @@ const SessionReplay = () => {
 
                       return (
                         <button key={req._id || i} ref={isActive ? activeNetRef : null} onClick={() => setSelectedNetworkReq(req)}
-                          style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', padding: '0 8px', height: 22, background: rowBg, border: 'none', borderBottom: `1px solid ${DT.bgAlt}`, borderLeft: isActive || isSel ? `3px solid ${DT.accent}` : '3px solid transparent', cursor: 'pointer', outline: 'none', transition: 'background 0.35s ease', animation: isActive && !isSel ? 'hlFlash 1.5s ease-out forwards' : 'none', fontFamily: 'inherit' }}>
+                          style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', padding: '0 8px', height: 22, background: rowBg, border: 'none', borderBottom: `1px solid ${DT.bgAlt}`, borderLeft: isActive || isSel ? `3px solid ${DT.accent}` : '3px solid transparent', cursor: 'pointer', outline: 'none', transition: 'background 0.35s ease', animation: isActive && !isSel ? `hlFlash${animSuffix} 1.5s ease-out forwards` : 'none', fontFamily: 'inherit' }}>
                           <span style={{ fontSize: 10, fontWeight: 800, color: methodColor(req.method), width: 52, flexShrink: 0, fontFamily: 'monospace' }}>{req.method}</span>
                           <span style={{ fontSize: 10, fontFamily: 'monospace', fontWeight: 600, width: 46, flexShrink: 0, textAlign: 'center', color: isOk ? DT.green : isNetErr ? DT.red : DT.textSub }}>
                             {req.status === 0 ? 'FAIL' : req.status}
@@ -850,7 +1016,7 @@ const SessionReplay = () => {
                         {/* Timeline dot */}
                         <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, marginTop: 10, background: isActive ? DT.accent : DT.textDim, border: `2px solid ${isActive ? DT.accent : DT.border}`, boxShadow: isActive ? `0 0 0 3px rgba(34,211,238,0.18)` : 'none', transition: 'all 0.3s ease' }} />
                         {/* Card — same darkness always, only border+shadow changes when active */}
-                        <div style={{ flex: 1, background: DT.surface, border: isActive ? `1px solid rgba(34,211,238,0.25)` : `1px solid ${DT.border}`, borderRadius: 8, padding: '7px 11px', transition: 'all 0.3s ease', boxShadow: isActive ? `0 0 0 1px rgba(34,211,238,0.1), 0 2px 12px rgba(34,211,238,0.06)` : 'none', animation: isActive ? 'hlFlashAction 1.5s ease-out forwards' : 'none' }}>
+                        <div style={{ flex: 1, background: DT.surface, border: isActive ? `1px solid rgba(34,211,238,0.25)` : `1px solid ${DT.border}`, borderRadius: 8, padding: '7px 11px', transition: 'all 0.3s ease', boxShadow: isActive ? `0 0 0 1px rgba(34,211,238,0.1), 0 2px 12px rgba(34,211,238,0.06)` : 'none', animation: isActive ? `hlFlashAction${animSuffix} 1.5s ease-out forwards` : 'none' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               {isActive && <span style={{ width: 4, height: 4, borderRadius: '50%', background: DT.accent, display: 'inline-block', animation: 'pulseGlow 1.5s infinite', flexShrink: 0 }} />}

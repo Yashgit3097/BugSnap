@@ -10,12 +10,12 @@ const RootRoute = () => {
   const { user, loading } = useAuth();
   if (loading) {
     return (
-      <div style={{ 
-        minHeight: '100vh', 
-        background: '#07070d', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
+      <div style={{
+        minHeight: '100vh',
+        background: '#07070d',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         color: '#a5b4fc',
         fontFamily: 'sans-serif',
         fontSize: '14px',
@@ -36,11 +36,9 @@ function App() {
           <Route path="/" element={<RootRoute />} />
           <Route path="/login" element={<Intro defaultTab="login" />} />
           <Route path="/register" element={<Intro defaultTab="register" />} />
-          
-          {/* Public route so developers can view the bug without logging in */}
+
           <Route path="/session/:publicId" element={<SessionReplay />} />
-          
-          {/* Fallback redirection to root */}
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

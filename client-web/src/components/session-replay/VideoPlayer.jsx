@@ -9,7 +9,118 @@ const DT = {
   text:     '#f4f4f5'
 };
 
-const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDuration, videoRef }) => {
+const getLogPreview = (log) => {
+  try {
+    if (log.message.startsWith('[') && log.message.endsWith(']')) {
+      const args = JSON.parse(log.message);
+      if (Array.isArray(args)) {
+        return args.map(arg => {
+          if (typeof arg === 'string') return arg;
+          if (typeof arg === 'object' && arg !== null) {
+            if (arg.message) return arg.message;
+            return JSON.stringify(arg);
+          }
+          return String(arg);
+        }).join(' ');
+      }
+    }
+  } catch (e) {}
+  return log.message;
+};
+
+const TimelineMarker = ({ type, time, label, duration, onSeek }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  if (!duration) return null;
+  
+  const pct = (time / (duration * 1000)) * 100;
+  const leftPct = Math.max(0, Math.min(100, pct));
+  
+  const markerColor = type === 'error' ? '#f87171' : '#fb923c';
+  const glowColor = type === 'error' ? 'rgba(248, 113, 113, 0.5)' : 'rgba(251, 146, 60, 0.5)';
+  
+  const formatTime = (ms) => {
+    if (!ms || isNaN(ms) || !isFinite(ms)) return "00:00.0";
+    const s = Math.floor(ms / 1000);
+    const m = String(Math.floor(s / 60)).padStart(2, '0');
+    const sec = String(s % 60).padStart(2, '0');
+    const t = Math.floor((ms % 1000) / 100);
+    return `${m}:${sec}.${t}`;
+  };
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: `${leftPct}%`,
+        top: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 6,
+        height: 6,
+        borderRadius: '50%',
+        background: markerColor,
+        boxShadow: `0 0 6px ${glowColor}`,
+        border: '1px solid #000000',
+        cursor: 'pointer',
+        pointerEvents: 'auto',
+        zIndex: isHovered ? 40 : 10,
+        transition: 'transform 0.1s ease-in-out',
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSeek(time);
+      }}
+    >
+      {isHovered && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(10, 10, 15, 0.95)',
+            backdropFilter: 'blur(10px)',
+            border: `1px solid ${type === 'error' ? 'rgba(248, 113, 113, 0.3)' : 'rgba(251, 146, 60, 0.3)'}`,
+            borderRadius: 6,
+            padding: '6px 10px',
+            color: '#f4f4f5',
+            fontSize: 10,
+            fontFamily: "'JetBrains Mono', monospace",
+            whiteSpace: 'nowrap',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            pointerEvents: 'none',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 2, marginBottom: 2 }}>
+            <span style={{ fontWeight: 700, color: markerColor, textTransform: 'uppercase', fontSize: 9 }}>
+              {type === 'error' ? 'Error Log' : 'Interaction'}
+            </span>
+            <span style={{ color: '#8e8e93', fontSize: 9 }}>{formatTime(time)}</span>
+          </div>
+          <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', display: 'inline-block' }}>
+            {label}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const getPlayableVideoUrl = (url) => {
+  if (!url) return '';
+  if (url.includes('res.cloudinary.com')) {
+    const parts = url.split('?');
+    parts[0] = parts[0].replace(/\.webm$/i, '.mp4');
+    return parts.join('?');
+  }
+  return url;
+};
+
+const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDuration, videoRef, logs = [], actions = [] }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -53,15 +164,44 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
     }
   };
 
-  const handleSeek = (e) => {
-    e.stopPropagation();
+  const handleDragUpdate = (clientX, rect) => {
     const d = duration || videoRef.current?.duration;
     if (videoRef.current && d && !isNaN(d) && isFinite(d)) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       const targetTime = pos * d;
       videoRef.current.currentTime = targetTime;
       setCurrentTime(targetTime * 1000);
+      
+      if (videoRef.current.ended) {
+        videoRef.current.pause();
+      }
+    }
+  };
+
+  const handleMouseDown = (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleDragUpdate(e.clientX, rect);
+
+    const handleMouseMove = (moveEvent) => {
+      handleDragUpdate(moveEvent.clientX, rect);
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMarkerSeek = (timeInMs) => {
+    if (videoRef.current && duration) {
+      const targetTime = timeInMs / 1000;
+      videoRef.current.currentTime = targetTime;
+      setCurrentTime(timeInMs);
       
       if (videoRef.current.ended) {
         videoRef.current.pause();
@@ -162,7 +302,7 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
         <div style={{ flex: 1, position: 'relative', background: '#000000', borderRadius: isFullscreen ? 0 : 10, border: isFullscreen ? 'none' : `1px solid rgba(255,255,255,0.03)`, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={togglePlay}>
           <video 
             ref={videoRef} 
-            src={session.videoUrl} 
+            src={getPlayableVideoUrl(session.videoUrl)} 
             onTimeUpdate={handleTimeUpdate}
             onLoadedMetadata={updateDuration}
             onDurationChange={updateDuration}
@@ -184,10 +324,33 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
           {/* Progress Seek Slider */}
           <div 
             style={{ height: 12, display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative' }}
-            onClick={handleSeek}
+            onMouseDown={handleMouseDown}
           >
             <div style={{ width: '100%', height: 4, background: 'rgba(255,255,255,0.06)', borderRadius: 2, position: 'relative' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: `${progressPercent}%`, background: 'linear-gradient(90deg, #0284c7, #22d3ee)', borderRadius: 2, boxShadow: '0 0 8px rgba(34, 211, 238, 0.4)' }} />
+              
+              {/* Event Markers */}
+              {logs.filter(log => log.type === 'error').map((log, idx) => (
+                <TimelineMarker
+                  key={`err-${log._id || idx}`}
+                  type="error"
+                  time={log.time}
+                  label={getLogPreview(log)}
+                  duration={duration}
+                  onSeek={handleMarkerSeek}
+                />
+              ))}
+              {actions.map((act, idx) => (
+                <TimelineMarker
+                  key={`act-${act._id || idx}`}
+                  type="action"
+                  time={act.time}
+                  label={`${act.type.toUpperCase()} on ${act.element}`}
+                  duration={duration}
+                  onSeek={handleMarkerSeek}
+                />
+              ))}
+
               <div style={{ position: 'absolute', left: `calc(${progressPercent}% - 5px)`, top: -3, width: 10, height: 10, borderRadius: '50%', background: '#ffffff', boxShadow: '0 0 10px rgba(34,211,238,0.8), 0 2px 4px rgba(0,0,0,0.5)' }} />
             </div>
           </div>

@@ -43,6 +43,9 @@ const SessionReplay = () => {
     axios.get(`http://localhost:5000/api/sessions/public/${publicId}`)
       .then(r => {
         setData(r.data);
+        if (r.data?.session?.duration) {
+          setDuration(r.data.session.duration);
+        }
       })
       .catch(e => console.error('Failed to fetch session', e))
       .finally(() => setLoading(false));
@@ -361,6 +364,8 @@ const SessionReplay = () => {
           duration={duration} 
           setDuration={setDuration} 
           videoRef={videoRef} 
+          logs={logs}
+          actions={actions}
         />
 
         {/* COLUMN 2: DEVTOOLS TABS PANEL */}

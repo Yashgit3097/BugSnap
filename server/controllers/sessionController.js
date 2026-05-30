@@ -29,7 +29,17 @@ export const createSession = asyncHandler(async (req, res) => {
 //Complete a session and save all recorded data
 export const completeSession = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { duration, videoUrl, videoPublicId, logs, networkRequests, actions } = req.body;
+  const { 
+    duration, 
+    videoUrl, 
+    videoPublicId, 
+    originalVideoUrl, 
+    replayVideoUrl, 
+    videoMetadata, 
+    logs, 
+    networkRequests, 
+    actions 
+  } = req.body;
 
   const session = await Session.findOne({ _id: id, userId: req.user._id });
 
@@ -46,8 +56,11 @@ export const completeSession = asyncHandler(async (req, res) => {
   session.status = 'completed';
   session.endedAt = Date.now();
   session.duration = duration;
-  session.videoUrl = videoUrl;
+  session.videoUrl = videoUrl || originalVideoUrl;
   session.videoPublicId = videoPublicId;
+  session.originalVideoUrl = originalVideoUrl || videoUrl;
+  session.replayVideoUrl = replayVideoUrl || videoUrl;
+  session.videoMetadata = videoMetadata;
   await session.save();
 
  

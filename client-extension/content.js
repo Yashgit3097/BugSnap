@@ -612,6 +612,9 @@ function renderFloatingWidget() {
 function stopRecordingAndShowModal() {
   if (!isRecording && !mediaRecorder) return; // Already stopped or never started
 
+  const stopTime = Date.now();
+  chrome.storage.local.set({ recording_stop_time: stopTime });
+
   isRecording = false;
   if (timerInterval) {
     clearInterval(timerInterval);

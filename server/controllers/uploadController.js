@@ -25,9 +25,31 @@ export const uploadVideo = asyncHandler(async (req, res) => {
     // Remove the temporary file created by multer
     fs.unlinkSync(req.file.path);
 
+    // Fetch finalized metadata from Cloudinary
+    let resourceInfo = {};
+    try {
+      resourceInfo = await cloudinary.api.resource(result.public_id, {
+        resource_type: 'video',
+      });
+    } catch (apiErr) {
+      console.warn('Failed to fetch detailed info from Cloudinary API:', apiErr);
+    }
+
+    // Generate optimized replay URL via Cloudinary transcoding transformations
+    const replayVideoUrl = result.secure_url.replace('/video/upload/', '/video/upload/f_mp4,q_auto/');
+
     res.json({
-      url: result.secure_url,
-      public_id: result.public_id,
+      originalVideoUrl: result.secure_url,
+      replayVideoUrl,
+      duration: resourceInfo.duration || result.duration || 0,
+      videoPublicId: result.public_id,
+      metadata: {
+        width: resourceInfo.width || result.width || 0,
+        height: resourceInfo.height || result.height || 0,
+        format: resourceInfo.format || result.format || 'webm',
+        bytes: resourceInfo.bytes || result.bytes || 0,
+        bitrate: resourceInfo.bit_rate || result.bit_rate || 0
+      }
     });
   } catch (error) {
     if (fs.existsSync(req.file.path)) {

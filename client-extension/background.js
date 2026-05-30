@@ -201,6 +201,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     chrome.storage.local.set({
       recording_state: 'idle',
       recording_start_time: null,
+      recording_stop_time: null,
       last_public_id: null,
       collected_logs: [],
       collected_network: [],
@@ -406,7 +407,8 @@ async function handleUploadData(request, sendResponse) {
       'collected_logs',
       'collected_network',
       'collected_actions',
-      'recording_start_time'
+      'recording_start_time',
+      'recording_stop_time'
     ]);
 
     const authToken = storageData.debugsnap_token;
@@ -461,11 +463,19 @@ async function handleUploadData(request, sendResponse) {
       throw new Error(err.message || 'Cloudinary video upload failed.');
     }
 
-    const { url: videoUrl, public_id: videoPublicId } = await uploadRes.json();
+    const { 
+      originalVideoUrl, 
+      replayVideoUrl, 
+      duration: cloudDuration, 
+      videoPublicId, 
+      metadata: videoMetadata 
+    } = await uploadRes.json();
 
     // Step 4: Finalize session completion with logs, network, actions
     const recordingStartTime = storageData.recording_start_time || Date.now();
-    const duration = Math.max(1, Math.floor((Date.now() - recordingStartTime) / 1000));
+    const recordingStopTime = storageData.recording_stop_time || Date.now();
+    const calculatedDuration = Math.max(1.0, (recordingStopTime - recordingStartTime) / 1000);
+    const duration = cloudDuration || calculatedDuration;
     
     const completeRes = await fetch(`${API_BASE}/api/sessions/${sessionId}/complete`, {
       method: 'POST',
@@ -475,8 +485,11 @@ async function handleUploadData(request, sendResponse) {
       },
       body: JSON.stringify({
         title: title || 'Untitled Recording',
-        videoUrl,
+        videoUrl: originalVideoUrl,
         videoPublicId: videoPublicId || '',
+        originalVideoUrl,
+        replayVideoUrl,
+        videoMetadata,
         logs: storageData.collected_logs || [],
         networkRequests: storageData.collected_network || [],
         actions: storageData.collected_actions || [],
@@ -518,7 +531,8 @@ async function uploadDirectlyFromBackground(videoDataUrl, errorMsg) {
       'collected_logs',
       'collected_network',
       'collected_actions',
-      'recording_start_time'
+      'recording_start_time',
+      'recording_stop_time'
     ]);
 
     const authToken = storageData.debugsnap_token;
@@ -574,11 +588,19 @@ async function uploadDirectlyFromBackground(videoDataUrl, errorMsg) {
       throw new Error(err.message || 'Cloudinary video upload failed.');
     }
 
-    const { url: videoUrl, public_id: videoPublicId } = await uploadRes.json();
+    const { 
+      originalVideoUrl, 
+      replayVideoUrl, 
+      duration: cloudDuration, 
+      videoPublicId, 
+      metadata: videoMetadata 
+    } = await uploadRes.json();
 
     // Step 4: Finalize session completion with logs, network, actions
     const recordingStartTime = storageData.recording_start_time || Date.now();
-    const duration = Math.max(1, Math.floor((Date.now() - recordingStartTime) / 1000));
+    const recordingStopTime = storageData.recording_stop_time || Date.now();
+    const calculatedDuration = Math.max(1.0, (recordingStopTime - recordingStartTime) / 1000);
+    const duration = cloudDuration || calculatedDuration;
     
     const completeRes = await fetch(`${API_BASE}/api/sessions/${sessionId}/complete`, {
       method: 'POST',
@@ -588,8 +610,11 @@ async function uploadDirectlyFromBackground(videoDataUrl, errorMsg) {
       },
       body: JSON.stringify({
         title: defaultTitle,
-        videoUrl,
+        videoUrl: originalVideoUrl,
         videoPublicId: videoPublicId || '',
+        originalVideoUrl,
+        replayVideoUrl,
+        videoMetadata,
         logs: storageData.collected_logs || [],
         networkRequests: storageData.collected_network || [],
         actions: storageData.collected_actions || [],

@@ -37,6 +37,19 @@ const sessionSchema = new mongoose.Schema(
     videoPublicId: {
       type: String,
     },
+    originalVideoUrl: {
+      type: String,
+    },
+    replayVideoUrl: {
+      type: String,
+    },
+    videoMetadata: {
+      width: Number,
+      height: Number,
+      format: String,
+      bytes: Number,
+      bitrate: Number
+    },
     browserInfo: {
       browser: String,
       os: String,

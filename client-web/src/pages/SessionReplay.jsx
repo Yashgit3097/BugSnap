@@ -11,15 +11,15 @@ import ActionsPanel from '../components/session-replay/ActionsPanel';
 
 // ─── Design Tokens ────────────────────────────────────────────────────
 const DT = {
-  bg:       '#000000',
-  border:   'rgba(255, 255, 255, 0.06)',
-  textDim:  '#8e8e93',
-  textSub:  '#d4d4d8',
-  text:     '#f4f4f5',
-  accent:   '#22d3ee',
-  green:    '#4ade80',
-  orange:   '#fb923c',
-  tag:      'rgba(255, 255, 255, 0.04)',
+  bg: '#000000',
+  border: 'rgba(255, 255, 255, 0.06)',
+  textDim: '#8e8e93',
+  textSub: '#d4d4d8',
+  text: '#f4f4f5',
+  accent: '#22d3ee',
+  green: '#4ade80',
+  orange: '#fb923c',
+  tag: 'rgba(255, 255, 255, 0.04)',
 };
 
 const SessionReplay = () => {
@@ -27,7 +27,7 @@ const SessionReplay = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
-  
+
   // Tabs states
   const [activeTab, setActiveTab] = useState('network'); // Default tab is Network
   const [selectedNetworkReq, setSelectedNetworkReq] = useState(null);
@@ -42,6 +42,7 @@ const SessionReplay = () => {
   useEffect(() => {
     axios.get(`http://localhost:5000/api/sessions/public/${publicId}`)
       .then(r => {
+        console.log('Fetched session data:', r.data);
         setData(r.data);
         if (r.data?.session?.duration) {
           setDuration(r.data.session.duration);
@@ -123,7 +124,7 @@ const SessionReplay = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', background: '#000000', color: DT.text, fontFamily: "'Outfit', 'Inter', -apple-system, sans-serif", WebkitFontSmoothing: 'antialiased' }}>
-      
+
       {/* Global CSS styles for split Network layouts and tabs */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
@@ -309,9 +310,9 @@ const SessionReplay = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg, rgba(6,182,212,0.12), rgba(16,185,129,0.06))', border: '1px solid rgba(6,182,212,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: DT.accent }}>
               <svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M5 3H3v2M21 3h-2v2M3 19v2h2M19 21h2v-2" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                 <circle cx="12" cy="12" r="5" stroke="currentColor" strokeWidth="2.5" />
-                <polygon points="11,10.5 14,12 11,13.5" fill="currentColor"/>
+                <polygon points="11,10.5 14,12 11,13.5" fill="currentColor" />
               </svg>
             </div>
             <div>
@@ -335,9 +336,9 @@ const SessionReplay = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {[
-            { label: `${logs.length} logs`,              color: DT.accent },
+            { label: `${logs.length} logs`, color: DT.accent },
             { label: `${networkRequests.length} requests`, color: DT.green },
-            { label: `${actions.length} actions`,         color: DT.orange },
+            { label: `${actions.length} actions`, color: DT.orange },
           ].map(({ label, color }) => (
             <div key={label} className="metric-pill" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 8, fontSize: 10, color: DT.textSub, fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, display: 'inline-block', boxShadow: `0 0 6px ${color}` }} />
@@ -346,8 +347,8 @@ const SessionReplay = () => {
           ))}
           <div style={{ width: 1, height: 16, background: DT.border }} />
           <button onClick={handleShareClick} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 8, background: shareCopied ? 'rgba(16,185,129,0.15)' : DT.accent, border: shareCopied ? '1px solid rgba(16,185,129,0.3)' : 'none', color: shareCopied ? DT.green : '#000', fontSize: 12, fontWeight: 700, cursor: 'pointer', outline: 'none', transition: 'all 0.25s', fontFamily: 'inherit', boxShadow: shareCopied ? 'none' : `0 0 12px rgba(34,211,238,0.3)` }}
-            onMouseEnter={e => { if(!shareCopied) { e.currentTarget.style.boxShadow = `0 0 20px rgba(34,211,238,0.5)`; e.currentTarget.style.background = '#67e8f9'; } }}
-            onMouseLeave={e => { if(!shareCopied) { e.currentTarget.style.boxShadow = `0 0 12px rgba(34,211,238,0.3)`; e.currentTarget.style.background = DT.accent; } }}>
+            onMouseEnter={e => { if (!shareCopied) { e.currentTarget.style.boxShadow = `0 0 20px rgba(34,211,238,0.5)`; e.currentTarget.style.background = '#67e8f9'; } }}
+            onMouseLeave={e => { if (!shareCopied) { e.currentTarget.style.boxShadow = `0 0 12px rgba(34,211,238,0.3)`; e.currentTarget.style.background = DT.accent; } }}>
             {shareCopied ? <><Check size={13} /> Copied URL!</> : <><Share2 size={13} /> Share</>}
           </button>
         </div>
@@ -357,20 +358,20 @@ const SessionReplay = () => {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden', padding: 16, gap: 16 }}>
 
         {/* COLUMN 1: VIDEO PLAYER PANEL */}
-        <VideoPlayer 
-          session={session} 
-          currentTime={currentTime} 
-          setCurrentTime={setCurrentTime} 
-          duration={duration} 
-          setDuration={setDuration} 
-          videoRef={videoRef} 
+        <VideoPlayer
+          session={session}
+          currentTime={currentTime}
+          setCurrentTime={setCurrentTime}
+          duration={duration}
+          setDuration={setDuration}
+          videoRef={videoRef}
           logs={logs}
           actions={actions}
         />
 
         {/* COLUMN 2: DEVTOOLS TABS PANEL */}
         <div className="cyber-glass" style={{ width: '55%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          
+
           {/* Top Panel Tab switcher */}
           <div style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', background: 'rgba(5, 5, 8, 0.4)', borderBottom: `1px solid ${DT.border}`, flexShrink: 0, paddingLeft: 4 }}>
             <div style={{ display: 'flex', alignItems: 'stretch' }}>
@@ -381,24 +382,24 @@ const SessionReplay = () => {
               ].map(tab => {
                 const isActive = activeTab === tab.id;
                 return (
-                  <button 
-                    key={tab.id} 
-                    onClick={() => { setActiveTab(tab.id); }} 
+                  <button
+                    key={tab.id}
+                    onClick={() => { setActiveTab(tab.id); }}
                     className={`tab-btn ${isActive ? 'active' : ''}`}
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 6, 
-                      padding: '0 16px', 
-                      height: 38, 
-                      fontSize: 12, 
-                      fontWeight: isActive ? 600 : 400, 
-                      color: isActive ? DT.accent : DT.textDim, 
-                      background: 'transparent', 
-                      border: 'none', 
-                      cursor: 'pointer', 
-                      outline: 'none', 
-                      fontFamily: 'inherit' 
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '0 16px',
+                      height: 38,
+                      fontSize: 12,
+                      fontWeight: isActive ? 600 : 400,
+                      color: isActive ? DT.accent : DT.textDim,
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      fontFamily: 'inherit'
                     }}
                   >
                     {tab.label}
@@ -417,36 +418,36 @@ const SessionReplay = () => {
 
           {/* Conditional Sub-panels */}
           {activeTab === 'console' && (
-            <ConsolePanel 
-              logs={logs} 
-              currentTime={currentTime} 
-              consoleFilter={consoleFilter} 
-              setConsoleFilter={setConsoleFilter} 
-              activeLogIndex={activeLogIndex} 
+            <ConsolePanel
+              logs={logs}
+              currentTime={currentTime}
+              consoleFilter={consoleFilter}
+              setConsoleFilter={setConsoleFilter}
+              activeLogIndex={activeLogIndex}
             />
           )}
 
           {activeTab === 'network' && (
-            <NetworkPanel 
-              networkRequests={networkRequests} 
-              currentTime={currentTime} 
-              networkFilter={networkFilter} 
-              setNetworkFilter={setNetworkFilter} 
-              selectedNetworkReq={selectedNetworkReq} 
-              setSelectedNetworkReq={setSelectedNetworkReq} 
-              activeSubTab={activeSubTab} 
-              setActiveSubTab={setActiveSubTab} 
-              activeNetIndex={activeNetIndex} 
+            <NetworkPanel
+              networkRequests={networkRequests}
+              currentTime={currentTime}
+              networkFilter={networkFilter}
+              setNetworkFilter={setNetworkFilter}
+              selectedNetworkReq={selectedNetworkReq}
+              setSelectedNetworkReq={setSelectedNetworkReq}
+              activeSubTab={activeSubTab}
+              setActiveSubTab={setActiveSubTab}
+              activeNetIndex={activeNetIndex}
               duration={duration}
               progressPercent={progressPercent}
             />
           )}
 
           {activeTab === 'actions' && (
-            <ActionsPanel 
-              actions={actions} 
-              currentTime={currentTime} 
-              activeActIndex={activeActIndex} 
+            <ActionsPanel
+              actions={actions}
+              currentTime={currentTime}
+              activeActIndex={activeActIndex}
             />
           )}
         </div>

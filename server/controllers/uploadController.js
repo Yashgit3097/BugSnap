@@ -20,6 +20,11 @@ export const uploadVideo = asyncHandler(async (req, res) => {
     const result = await cloudinary.uploader.upload(req.file.path, {
       resource_type: 'video',
       folder: 'debugsnap/videos',
+      // Pre-generate the MP4 replay derivative during upload. Without this the
+      // f_mp4 URL transcodes lazily on first view and streams without byte-range
+      // support, which breaks timeline seeking the first time a session is opened.
+      eager: [{ format: 'mp4', quality: 'auto' }],
+      eager_async: false,
     });
 
     // Remove the temporary file created by multer
@@ -35,8 +40,10 @@ export const uploadVideo = asyncHandler(async (req, res) => {
       console.warn('Failed to fetch detailed info from Cloudinary API:', apiErr);
     }
 
-    // Generate optimized replay URL via Cloudinary transcoding transformations
-    const replayVideoUrl = result.secure_url.replace('/video/upload/', '/video/upload/f_mp4,q_auto/');
+    // Prefer the eagerly generated (already cached, range-request capable) MP4;
+    // fall back to the lazy transformation URL if eager processing failed.
+    const eagerMp4 = result.eager && result.eager[0] && result.eager[0].secure_url;
+    const replayVideoUrl = eagerMp4 || result.secure_url.replace('/video/upload/', '/video/upload/f_mp4,q_auto/');
 
     res.json({
       originalVideoUrl: result.secure_url,

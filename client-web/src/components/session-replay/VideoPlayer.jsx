@@ -128,6 +128,32 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
   const pendingSeekTimeRef = useRef(null);
   const playbackRafRef = useRef(null);
   const wasPlayingBeforeSeekRef = useRef(false);
+  const durationRecoveryRef = useRef(false);
+  const pendingRetrySeekRef = useRef(null);
+
+  // MediaRecorder-produced WebM files report duration as Infinity because the
+  // header lacks a Duration element. Forcing a seek far past the end makes the
+  // browser scan the file and emit durationchange with the real duration.
+  const recoverInfiniteDuration = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || durationRecoveryRef.current) return;
+    if (video.duration !== Infinity) return;
+
+    durationRecoveryRef.current = true;
+
+    const onDurationChange = () => {
+      if (video.duration !== Infinity && isFinite(video.duration) && video.duration > 0) {
+        video.removeEventListener('durationchange', onDurationChange);
+        video.currentTime = 0;
+        durationRecoveryRef.current = false;
+        setDuration(video.duration);
+        setVideoReady(true);
+      }
+    };
+
+    video.addEventListener('durationchange', onDurationChange);
+    video.currentTime = 1e101;
+  }, [setDuration, videoRef]);
 
   const updateDuration = useCallback(() => {
     if (session?.duration && !isNaN(session.duration) && isFinite(session.duration) && session.duration > 0) {
@@ -138,14 +164,22 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
       const d = videoRef.current.duration;
       if (d && !isNaN(d) && isFinite(d) && d > 0) {
         setDuration(d);
+      } else if (d === Infinity) {
+        recoverInfiniteDuration();
       }
     }
-  }, [session?.duration, setDuration, videoRef]);
+  }, [session?.duration, setDuration, videoRef, recoverInfiniteDuration]);
 
   const handleLoadedMetadata = useCallback(() => {
     updateDuration();
+    // Even when the DB already knows the duration, an Infinity-duration video
+    // element can't seek reliably — force the browser to compute the real one.
+    if (videoRef.current && videoRef.current.duration === Infinity) {
+      recoverInfiniteDuration();
+      return;
+    }
     setVideoReady(true);
-  }, [updateDuration]);
+  }, [updateDuration, recoverInfiniteDuration, videoRef]);
 
   const handleCanPlay = useCallback(() => {
     updateDuration();
@@ -158,6 +192,7 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
     setVideoReady(false);
     setIsBuffering(true);
     setIsSeeking(false);
+    pendingRetrySeekRef.current = null;
 
     if (session?.duration && !isNaN(session.duration) && isFinite(session.duration) && session.duration > 0) {
       setDuration(session.duration);
@@ -235,12 +270,28 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
   };
 
   const handleSeeked = () => {
+    // If the browser clamped the seek short of the target (data not yet
+    // downloaded on a non-range-request stream), keep the buffering overlay
+    // and let progress/canplay events retry until the target is reachable.
+    const target = pendingRetrySeekRef.current;
+    if (target !== null && videoRef.current && !isTargetReached(target)) {
+      setIsBuffering(true);
+      retryPendingSeek();
+      return;
+    }
+    pendingRetrySeekRef.current = null;
+
     setIsSeeking(false);
     setIsBuffering(false);
     // Resume playback if video was playing before seek
     if (wasPlayingBeforeSeekRef.current && videoRef.current && videoRef.current.paused) {
       videoRef.current.play().catch(err => console.warn('Resume playback failed:', err));
     }
+  };
+
+  // As more of the file downloads, retry any seek that was clamped short
+  const handleProgress = () => {
+    retryPendingSeek();
   };
 
   const handlePlaying = () => {
@@ -265,17 +316,50 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
 
   const isTimeSeekable = (targetTime) => {
     if (!videoRef.current) return false;
+    if (durationRecoveryRef.current) return false; // Mid duration-scan, seek would conflict
     const d = duration || videoRef.current.duration;
-    // Video must have valid duration AND be able to seek (readyState >= 3 means HAVE_FUTURE_DATA)
+    // Video must have a valid finite duration AND metadata loaded (readyState >= 1).
+    // The browser buffers the target range itself on seek — no need to wait for HAVE_FUTURE_DATA.
     if (!d || isNaN(d) || !isFinite(d) || d <= 0) return false;
-    if (videoRef.current.readyState < 3) return false; // Not ready to seek yet
+    if (videoRef.current.readyState < 1) return false; // Metadata not loaded yet
     return targetTime >= 0 && targetTime <= d;
   };
+
+  // When the server streams without byte-range support (e.g. Cloudinary's first
+  // lazy transcode), the browser clamps seeks to the downloaded portion and the
+  // video lands at the wrong time. Remember the intended target and re-seek as
+  // more data arrives (progress/canplay events) until we land close enough.
+  const isTargetReached = (target) =>
+    videoRef.current && Math.abs(videoRef.current.currentTime - target) < 0.35;
+
+  const retryPendingSeek = useCallback(() => {
+    const video = videoRef.current;
+    const target = pendingRetrySeekRef.current;
+    if (!video || target === null || durationRecoveryRef.current) return;
+
+    if (isTargetReached(target)) {
+      pendingRetrySeekRef.current = null;
+      return;
+    }
+
+    // Re-attempt only when the seekable ranges now cover the target,
+    // otherwise wait for the next progress event.
+    const ranges = video.seekable;
+    for (let i = 0; i < ranges.length; i++) {
+      if (target >= ranges.start(i) && target <= ranges.end(i)) {
+        try {
+          video.currentTime = target;
+        } catch (err) { }
+        return;
+      }
+    }
+  }, [videoRef]);
 
   const commitSeek = (targetTime) => {
     if (!videoRef.current) return;
     if (!isTimeSeekable(targetTime)) return;
     try {
+      pendingRetrySeekRef.current = targetTime;
       videoRef.current.currentTime = targetTime;
     } catch (err) {
       console.warn('Seeking failed:', err);
@@ -285,9 +369,9 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
   const handleDragUpdate = (clientX, rect, force = false) => {
     const d = duration || videoRef.current?.duration;
     if (videoRef.current && d && !isNaN(d) && isFinite(d) && d > 0) {
-      // Additional check: ensure video has enough data to seek
-      if (videoRef.current.readyState < 3) {
-        console.warn('Video not ready for seeking yet. ReadyState:', videoRef.current.readyState);
+      // Metadata must be loaded before seeking; the browser buffers the target itself
+      if (videoRef.current.readyState < 1 || durationRecoveryRef.current) {
+        console.warn('Video metadata not loaded yet. ReadyState:', videoRef.current.readyState);
         return;
       }
 
@@ -322,9 +406,12 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
   };
 
   const handleMouseDown = (e) => {
-    // Prevent clicks/drags before video is ready AND has valid seekable duration
-    if (!videoReady || !videoRef.current || videoRef.current.duration <= 0 || videoRef.current.readyState < 3) {
-      console.warn('Video not ready for seeking. VideoReady:', videoReady, 'Duration:', videoRef.current?.duration, 'ReadyState:', videoRef.current?.readyState);
+    // Prevent clicks/drags before metadata is loaded and a valid duration is known.
+    // duration state comes from the DB session record, so seeking works even
+    // before the video element has buffered any frames.
+    const d = duration || videoRef.current?.duration;
+    if (!videoReady || !videoRef.current || !d || !isFinite(d) || d <= 0 || videoRef.current.readyState < 1 || durationRecoveryRef.current) {
+      console.warn('Video not ready for seeking. VideoReady:', videoReady, 'Duration:', d, 'ReadyState:', videoRef.current?.readyState);
       return;
     }
 
@@ -359,9 +446,10 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
   };
 
   const handleMarkerSeek = useCallback((timeInMs) => {
-    // Prevent clicks before video is truly ready to seek
-    if (!videoReady || !videoRef.current || videoRef.current.duration <= 0 || videoRef.current.readyState < 3) {
-      console.warn('Video not ready for marker seeking. VideoReady:', videoReady, 'Duration:', videoRef.current?.duration, 'ReadyState:', videoRef.current?.readyState);
+    // Prevent clicks before metadata is loaded and a valid duration is known
+    const d = duration || videoRef.current?.duration;
+    if (!videoReady || !videoRef.current || !d || !isFinite(d) || d <= 0 || videoRef.current.readyState < 1 || durationRecoveryRef.current) {
+      console.warn('Video not ready for marker seeking. VideoReady:', videoReady, 'Duration:', d, 'ReadyState:', videoRef.current?.readyState);
       return;
     }
 
@@ -526,6 +614,7 @@ const VideoPlayer = ({ session, currentTime, setCurrentTime, duration, setDurati
             onDurationChange={updateDuration}
             onCanPlay={handleCanPlay}
             onCanPlayThrough={handleCanPlayThrough}
+            onProgress={handleProgress}
             onWaiting={handleWaiting}
             onSeeking={handleSeeking}
             onSeeked={handleSeeked}

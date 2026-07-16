@@ -452,8 +452,36 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === 'RENDER_UPLOAD_MODAL') {
-    capturedVideoDataUrl = request.videoDataUrl;
-    showUploadModal();
+    // Patch the WebM duration header before showing the upload modal,
+    // using the recorded start/stop timestamps persisted in storage.
+    chrome.storage.local.get(['recording_start_time', 'recording_stop_time'], (res) => {
+      const durationMs = (res.recording_start_time && res.recording_stop_time)
+        ? Math.max(0, res.recording_stop_time - res.recording_start_time)
+        : 0;
+
+      if (typeof fixWebmDuration === 'function' && durationMs > 0) {
+        fetch(request.videoDataUrl)
+          .then((r) => r.blob())
+          .then((blob) => fixWebmDuration(blob, durationMs))
+          .then((patched) => new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(patched);
+          }))
+          .then((dataUrl) => {
+            capturedVideoDataUrl = dataUrl;
+            showUploadModal();
+          })
+          .catch(() => {
+            capturedVideoDataUrl = request.videoDataUrl;
+            showUploadModal();
+          });
+      } else {
+        capturedVideoDataUrl = request.videoDataUrl;
+        showUploadModal();
+      }
+    });
     sendResponse({ ok: true });
     return false;
   }
@@ -615,6 +643,11 @@ function stopRecordingAndShowModal() {
   const stopTime = Date.now();
   chrome.storage.local.set({ recording_stop_time: stopTime });
 
+  // Capture elapsed duration BEFORE recordingStartTime is reset below.
+  // MediaRecorder streams WebM without a duration header, so we measure
+  // the real wall-clock duration and inject it into the blob before upload.
+  const capturedStartTime = recordingStartTime;
+
   isRecording = false;
   if (timerInterval) {
     clearInterval(timerInterval);
@@ -623,6 +656,45 @@ function stopRecordingAndShowModal() {
   recordingStartTime = null;
 
   showPreparingOverlay();
+
+  // Resolves the recorded duration in ms (falls back to chrome.storage
+  // if the in-memory start time was lost, e.g. after a page reload).
+  const resolveDurationMs = (callback) => {
+    if (capturedStartTime) {
+      callback(Math.max(0, stopTime - capturedStartTime));
+      return;
+    }
+    chrome.storage.local.get(['recording_start_time'], (res) => {
+      callback(res.recording_start_time ? Math.max(0, stopTime - res.recording_start_time) : 0);
+    });
+  };
+
+  // Patches the WebM duration header, then converts to a Data URL for upload
+  const finalizeBlob = (rawBlob) => {
+    resolveDurationMs((durationMs) => {
+      const proceed = (finalBlob) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          capturedVideoDataUrl = reader.result;
+          chrome.storage.local.set({ recording_state: 'idle' });
+          showUploadModal();
+        };
+        reader.onerror = () => {
+          chrome.storage.local.set({ recording_state: 'idle' });
+          showUploadModalFallback('Failed to process recorded video.');
+        };
+        reader.readAsDataURL(finalBlob);
+      };
+
+      if (typeof fixWebmDuration === 'function' && durationMs > 0) {
+        fixWebmDuration(rawBlob, durationMs)
+          .then(proceed)
+          .catch(() => proceed(rawBlob));
+      } else {
+        proceed(rawBlob);
+      }
+    });
+  };
 
   const processChunks = () => {
     // Stop all media tracks to release the stream
@@ -639,15 +711,21 @@ function stopRecordingAndShowModal() {
           mediaRecorder = null;
           chrome.storage.local.set({ recording_state: 'idle' });
           showUploadModalFallback(
-            (response && response.error) || 
-            (lastErr && lastErr.message) || 
+            (response && response.error) ||
+            (lastErr && lastErr.message) ||
             'No video data was recorded (or page was reloaded before capturing frames).'
           );
         } else {
-          capturedVideoDataUrl = response.videoDataUrl;
+          // Compiled video also lacks a duration header — patch it too
           mediaRecorder = null;
-          chrome.storage.local.set({ recording_state: 'idle' });
-          showUploadModal();
+          fetch(response.videoDataUrl)
+            .then((r) => r.blob())
+            .then((blob) => finalizeBlob(blob))
+            .catch(() => {
+              capturedVideoDataUrl = response.videoDataUrl;
+              chrome.storage.local.set({ recording_state: 'idle' });
+              showUploadModal();
+            });
         }
       });
       return;
@@ -657,17 +735,7 @@ function stopRecordingAndShowModal() {
     recordedChunks = [];
     mediaRecorder = null;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      capturedVideoDataUrl = reader.result;
-      chrome.storage.local.set({ recording_state: 'idle' });
-      showUploadModal();
-    };
-    reader.onerror = () => {
-      chrome.storage.local.set({ recording_state: 'idle' });
-      showUploadModalFallback('Failed to process recorded video.');
-    };
-    reader.readAsDataURL(blob);
+    finalizeBlob(blob);
   };
 
   if (!mediaRecorder || mediaRecorder.state === 'inactive') {

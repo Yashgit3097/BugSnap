@@ -40,7 +40,7 @@ const SessionReplay = () => {
   const videoRef = useRef(null);
 
   useEffect(() => {
-    axios.get(`http://localhost:5000/api/sessions/public/${publicId}`)
+    axios.get(`/api/sessions/public/${publicId}`)
       .then(r => {
         console.log('Fetched session data:', r.data);
         setData(r.data);

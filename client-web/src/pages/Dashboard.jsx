@@ -7,6 +7,7 @@ import {
   Key, Copy, Check, Laptop, Activity, FileText, X, Play, Wifi, WifiOff, Zap, RefreshCw
 } from 'lucide-react';
 import { io } from 'socket.io-client';
+import { API_URL } from '../config';
 
 const DASH_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800;14..32,900&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -68,7 +69,7 @@ const Dashboard = () => {
   const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
-    axios.get('http://localhost:5000/api/sessions/my')
+    axios.get('/api/sessions/my')
       .then(({ data }) => setSessions(data))
       .catch(e => console.error('Failed to fetch sessions', e))
       .finally(() => setLoading(false));
@@ -76,7 +77,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!user?.token) return;
-    const socket = io('http://localhost:5000', {
+    const socket = io(API_URL, {
       query: { token: user.token },
       reconnectionAttempts: 5,
       reconnectionDelay: 3000,
@@ -95,7 +96,7 @@ const Dashboard = () => {
     if (!window.confirm('Permanently delete this session and all its logs?')) return;
     setDeletingId(sessionId);
     try {
-      await axios.delete(`http://localhost:5000/api/sessions/${sessionId}`);
+      await axios.delete(`/api/sessions/${sessionId}`);
       setSessions(s => s.filter(x => x._id !== sessionId));
     } catch { alert('Failed to delete session. Please try again.'); }
     finally { setDeletingId(null); }
